@@ -1,0 +1,32 @@
+# Visual Studio
+.vs/
+**/.vs/
+
+# .NET build files
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Node
+node_modules/
+**/node_modules/
+
+# Angular
+.angular/
+dist/
+**/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
