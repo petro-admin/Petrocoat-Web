@@ -7,6 +7,10 @@ bin/
 obj/
 **/bin/
 **/obj/
+**/publish/
+
+# Contains the real production JWT signing key - keep out of the (currently public) repo
+**/appsettings.Production.json
 
 # Node
 node_modules/

@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using StimesErp.Api.Data;
+using StimesErp.Api.Json;
 using StimesErp.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,14 +10,22 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Services ---
 builder.Services.AddControllers().AddJsonOptions(opts =>
 {
-    // DataTable serializes fine with Newtonsoft; with System.Text.Json we return DataTable
-    // as-is which works for simple cases. If you hit serialization issues, add
-    // Microsoft.AspNetCore.Mvc.NewtonsoftJson and call AddNewtonsoftJson() instead.
+    opts.JsonSerializerOptions.Converters.Add(new FlexibleDateTimeConverterFactory());
+    opts.JsonSerializerOptions.Converters.Add(new FlexibleStringConverter());
+    opts.JsonSerializerOptions.Converters.Add(new FlexibleIntConverter());
+    opts.JsonSerializerOptions.Converters.Add(new FlexibleNullableIntConverter());
+    opts.JsonSerializerOptions.Converters.Add(new FlexibleDecimalConverter());
+    opts.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
 });
 
 builder.Services.AddScoped<SqlHelper>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DailySiteService>();
+builder.Services.AddScoped<SettingsService>();
+builder.Services.AddScoped<StoreIndentService>();
+builder.Services.AddScoped<ApprovalService>();
+builder.Services.AddScoped<UserRightsService>();
+builder.Services.AddScoped<DashboardService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

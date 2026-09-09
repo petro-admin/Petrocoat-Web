@@ -1,0 +1,422 @@
+<div class="page">
+  <div class="topbar">
+    <div>
+      <h2>{{ isNew ? 'New Daily Site' : 'Edit Daily Site' }}</h2>
+      <span class="docno" *ngIf="form.get('docNo')?.value as dn">{{ dn }}</span>
+      <span class="docno" *ngIf="form.get('jobNo')?.value as jn">SO: {{ jn }}</span>
+    </div>
+    <div class="topbar-actions">
+      @if (!isNew) {
+        <button class="secondary" type="button" (click)="print()">Print</button>
+      }
+      <button class="secondary" type="button" (click)="printDemo()">Demo</button>
+      <button class="secondary" type="button" (click)="cancel()">Cancel</button>
+      <button class="primary" type="button" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-overlay">
+      <span class="spinner"></span>
+      <span>Loading Sales Order details...</span>
+    </div>
+  }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="tabs" [class.is-loading]="loading()">
+    @for (t of tabs; track t.key) {
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === t.key"
+        [disabled]="loading()"
+        (click)="switchTab(t.key)">
+        {{ t.label }}
+      </button>
+    }
+  </div>
+
+  <form [formGroup]="form" [class.is-loading]="loading()">
+
+    <!-- ============ BASIC DETAILS ============ -->
+    <section class="card" [hidden]="activeTab() !== 'basic'">
+      <div class="grid-2">
+        <div class="field">
+          <label>Doc No</label>
+          <input formControlName="docNo" />
+        </div>
+        <div class="field">
+          <label>Date *</label>
+          <input type="date" formControlName="docDate" />
+        </div>
+
+        <div class="field">
+          <label>Sales Order No *</label>
+          <input formControlName="jobNo" list="sales-order-options" placeholder="Type Sales Order No" (input)="onSalesOrderTextChanged($any($event.target).value)" (change)="onSalesOrderSelected($any($event.target).value)" />
+          <input type="hidden" formControlName="jobCode" />
+          <datalist id="sales-order-options">@for (order of salesOrders(); track $index) {<option [value]="read(order, 'SONo', 'SalesOrderNo', 'JobNo')"></option>}</datalist>
+          <small class="field-hint" *ngIf="salesOrders().length === 0">No sales orders available</small>
+        </div>
+        <div class="field" *ngIf="existingSalesOrders().length > 0">
+          <label>Existing Sales Order / Revision</label>
+          <input formControlName="existingJobNo" list="existing-sales-order-options" placeholder="Optional" (input)="onExistingSalesOrderChanged($any($event.target).value)" />
+          <input type="hidden" formControlName="existingJobCode" />
+          <datalist id="existing-sales-order-options">@for (order of existingSalesOrders(); track $index) {<option [value]="read(order, 'SONo', 'SalesOrderNo')"></option>}</datalist>
+        </div>
+        <div class="field">
+          <label>Customer *</label>
+          <input formControlName="customer" list="customer-options" placeholder="Type to filter" (input)="onLookupTextChanged(form, 'customer', 'customerCode', $any($event.target).value, customers(), ['CustomerCode'], ['CustomerName'])" />
+          <input type="hidden" formControlName="customerCode" />
+          <datalist id="customer-options">@for (item of customers(); track $index) {<option [value]="read(item, 'CustomerName')"></option>}</datalist>
+        </div>
+
+        <div class="field">
+          <label>Start Date</label>
+          <input type="date" formControlName="startDate" />
+        </div>
+        <div class="field">
+          <label>Completed Date</label>
+          <input type="date" formControlName="finishDate" />
+        </div>
+
+        <div class="field">
+          <label>Location</label>
+          <input formControlName="location" />
+        </div>
+        <div class="field">
+          <label>Project</label>
+          <input formControlName="project" />
+        </div>
+
+        <div class="field">
+          <label>Start Time</label>
+          <input type="time" formControlName="startTime" />
+        </div>
+        <div class="field">
+          <label>Basic Hrs</label>
+          <input type="number" formControlName="basicHrs" />
+        </div>
+
+        <div class="field">
+          <label>Supervisor</label>
+          <input formControlName="supervisorName" list="supervisor-options" placeholder="Type supervisor name" (input)="onHeaderEmployeeChanged('supervisorName', 'supervisor', $any($event.target).value)" />
+          <datalist id="supervisor-options">@for (employee of employees(); track $index) {<option [value]="read(employee, 'EmpFullName', 'EmployeeName')"></option>}</datalist>
+        </div>
+        <div class="field">
+          <label>Engineer</label>
+          <input formControlName="engineerName" list="engineer-options" placeholder="Type engineer name" (input)="onHeaderEmployeeChanged('engineerName', 'engineer', $any($event.target).value)" />
+          <datalist id="engineer-options">@for (employee of employees(); track $index) {<option [value]="read(employee, 'EmpFullName', 'EmployeeName')"></option>}</datalist>
+        </div>
+
+        <div class="field">
+          <label>Materials Received By</label>
+          <input formControlName="materialsReceivedByName" list="materials-received-by-options" placeholder="Type employee name" (input)="onHeaderEmployeeChanged('materialsReceivedByName', 'materialsReceivedBy', $any($event.target).value)" />
+          <datalist id="materials-received-by-options">@for (employee of employees(); track $index) {<option [value]="read(employee, 'EmpFullName', 'EmployeeName')"></option>}</datalist>
+        </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input type="checkbox" formControlName="withoutMaterial" />
+            Without Material
+          </label>
+        </div>
+
+        <div class="field full-width">
+          <label>Remarks</label>
+          <textarea formControlName="remarks" rows="2"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCOPE OF WORK ============ -->
+    <!-- @if (not [hidden]) so only the active tab's rows are ever built into the DOM at
+         once - building all 5 tabs' full tables simultaneously on every load was the real
+         cause of the freeze on weaker devices (e.g. Samsung tablets), not tab-switching itself. -->
+    @if (activeTab() === 'scope') {
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Scope of Work</h3>
+      </div>
+      <div class="table-scroll">
+        <table formArrayName="scopeOfWork">
+          <thead>
+            <tr>
+              <th>Sl</th>
+              @if (!isDivisionOne()) { <th>Description of Works</th> }
+              @if (isDivisionOne()) { <th>Special Requirement</th> }
+              <th>Unit</th>
+              <th>Area</th><th>Area Completed</th><th>Manhour Engaged Today</th>
+              <th>Today Achieved Rate</th><th>Total Achieved Rate</th>
+              <th>Total Area Completed</th><th>Balance to Complete</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (scopeDisplayIndexes; as indexes) {
+            @for (scopeIndex of indexes; track scopeOfWork.at(scopeIndex); let displayIndex = $index) {
+              @if (!isDivisionOne() && isScopeGroupStart(indexes, displayIndex)) {
+                <tr class="scope-group-row">
+                  <td colspan="12">
+                    <button type="button" class="scope-group-toggle" [style.color]="scopeGroupColor(indexes, displayIndex)" [attr.aria-expanded]="!isScopeGroupCollapsed(indexes, displayIndex)" (click)="toggleScopeGroup(indexes, displayIndex)">
+                      <span>{{ isScopeGroupCollapsed(indexes, displayIndex) ? '+' : '-' }}</span> {{ scopeGroupLabel(indexes, displayIndex) }}
+                    </button>
+                  </td>
+                </tr>
+              }
+              @let row = scopeOfWork.at(scopeIndex);
+              <tr [formGroupName]="scopeIndex" [hidden]="!isDivisionOne() && isScopeGroupCollapsed(indexes, displayIndex)">
+                <td>{{ row.get('slNo')?.value }}</td>
+                @if (!isDivisionOne()) {
+                  <td class="wrap-cell"><span>{{ row.get('surfacePreparationName')?.value }}</span><input type="hidden" formControlName="surfacePreparationCode" /></td>
+                }
+                @if (isDivisionOne()) { <td><input formControlName="specialRequirement" /></td> }
+                <td><input formControlName="unitName" readonly /><input type="hidden" formControlName="unitCode" /></td>
+                <td><input type="number" formControlName="scopeOfWorkAsPerJobCard" readonly /></td>
+                <td><input type="number" class="key-input" formControlName="areaCompleted" (change)="recalculateScopeRow(scopeIndex)" /></td>
+                <td><input type="number" class="key-input" formControlName="manhourEngaged" (change)="recalculateScopeRow(scopeIndex)" /></td>
+                <td><input type="number" formControlName="achievedRate" readonly /></td>
+                <td><input type="number" formControlName="achievedRateForEachActivity" readonly /></td>
+                <td><input type="number" formControlName="totalAreaCompleted" readonly /></td>
+                <td><input type="number" formControlName="balanceToComplete" readonly /></td>
+                <td><button type="button" class="remove-btn" (click)="removeScopeRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    }
+
+    <!-- ============ MATERIAL ============ -->
+    @if (activeTab() === 'material') {
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Material</h3>
+        <button type="button" class="add-btn" (click)="addMaterialRow()">+ Add Row</button>
+      </div>
+      <div class="color-legend">
+        <strong>Material Type:</strong>
+        <span class="legend-item"><span class="legend-swatch" style="background:#FCE4D6;border-color:#F4B183"></span>Estimation Wise</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#DDEBF7;border-color:#B4C7E7"></span>Direct</span>
+      </div>
+      <datalist id="material-options">@for (item of materials(); track $index) {<option [value]="read(item, 'MaterialName')"></option>}</datalist>
+      <div class="table-scroll">
+        <table formArrayName="material">
+          <thead>
+            <tr>
+              <th>Sl</th><th>Item Description</th><th>Pack Size</th><th>Unit</th>
+              <th>Est. Qty</th><th>Received Qty</th><th>Received Today</th><th>Today Consumed</th><th>Base Unit</th>
+              <th>Balance at Site</th><th>Area/No/Mtr</th><th>Rate of Application</th>
+              <th>Area Supposed to Cover</th><th>Total Used</th><th>Balance(Estimation) </th><th>Remarks</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of material.controls; track row; let i = $index) {
+              <tr [formGroupName]="i" [style.background-color]="row.get('bgColor')?.value || null">
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td class="wrap-cell">
+                  @if (row.get('materialName')?.disabled) {
+                    <span>{{ row.get('materialName')?.value }}</span>
+                  } @else {
+                    <input formControlName="materialName" list="material-options" placeholder="Type to filter" (input)="onLookupTextChanged(row, 'materialName', 'materialCode', $any($event.target).value, materials(), ['MaterialCode'], ['MaterialName'])" />
+                  }
+                  <input type="hidden" formControlName="materialCode" />
+                </td>
+                <td><input formControlName="packSize" readonly /></td>
+                <td><input formControlName="unit" readonly /></td>
+                <td><input type="number" formControlName="totalMaterialEstimatedQty" readonly /></td>
+                <td><input type="number" formControlName="receivedQty" readonly /></td>
+                <td><input type="number" formControlName="materialReceivedTodayAtSite" readonly /></td>
+                <td><input type="number" class="key-input" formControlName="todayConsumed" (change)="recalculateMaterialRow(i)" /></td>
+                <td><select class="key-input" formControlName="baseUnitCode" (change)="recalculateMaterialRow(i)"><option value="">-Select-</option>@for (item of units(); track $index) {<option [value]="read(item, 'UnitCode')">{{ read(item, 'UnitDesc') }}</option>}</select></td>
+                <td><input type="number" formControlName="balanceAtSite" readonly /></td>
+                <td><input type="number" formControlName="area" (change)="recalculateMaterialRow(i)" /></td>
+                <td><input type="number" formControlName="rateOfApplication" readonly /></td>
+                <td><input type="number" formControlName="areaSupposedToCover" readonly /></td>
+                <td><input type="number" formControlName="todayMaterialsUsed" readonly /></td>
+                <td><input type="number" formControlName="balanceMaterials" readonly /></td>
+                <td><textarea class="remarks-cell" formControlName="remarks" rows="1"></textarea></td>
+                <td><button type="button" class="remove-btn" (click)="removeMaterialRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            @if (material.length === 0) {
+              <tr><td colspan="16" class="empty">No rows yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    }
+
+
+
+    <!-- ============ CONSUMABLES ============ -->
+    @if (activeTab() === 'consumables') {
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Consumables</h3>
+        <button type="button" class="add-btn" (click)="addConsumableRow()">+ Add Row</button>
+      </div>
+      <div class="color-legend">
+        <strong>Consumable Type:</strong>
+        <span class="legend-item"><span class="legend-swatch" style="background:#E2F0D9;border-color:#A9D18E"></span>Estimation Wise - Hard</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#FFF2CC;border-color:#FFD966"></span>Estimation Wise - Soft</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#DDEBF7;border-color:#B4C7E7"></span>Direct - Hard</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#FCE4D6;border-color:#F4B183"></span>Direct - Soft</span>
+      </div>
+      <datalist id="consumable-options">@for (item of consumablesLookup(); track $index) {<option [value]="read(item, 'Description')"></option>}</datalist>
+      <div class="table-scroll">
+        <table formArrayName="consumables">
+          <thead>
+            <tr><th>Sl</th><th>Consumable</th><th>Quantity</th><th>Used Today</th><th>Total Used</th><th>Base Unit</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (row of consumables.controls; track row; let i = $index) {
+              <tr [formGroupName]="i" [style.background-color]="row.get('bgColor')?.value || null">
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td><input formControlName="consumableName" list="consumable-options" placeholder="Type to filter" (input)="onLookupTextChanged(row, 'consumableName', 'consumableCode', $any($event.target).value, consumablesLookup(), ['ConsumableCode'], ['Description'])" /><input type="hidden" formControlName="consumableCode" /></td>
+                <td><input type="number" formControlName="quantity" readonly /></td>
+                <td><input type="number" class="key-input" formControlName="usedToday" (change)="recalculateConsumableRow(i)" /></td>
+                <td><input type="number" formControlName="totalConsumablesUsed" readonly /></td>
+                <td><select class="key-input" formControlName="baseUnitCode"><option value="">-Select-</option>@for (item of units(); track $index) {<option [value]="read(item, 'UnitCode')">{{ read(item, 'UnitDesc') }}</option>}</select></td>
+                <td><button type="button" class="remove-btn" (click)="removeConsumableRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            @if (consumables.length === 0) {
+              <tr><td colspan="7" class="empty">No rows yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    }
+
+    <!-- ============ MACHINERIES ============ -->
+    @if (activeTab() === 'machineries') {
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Machineries</h3>
+        <button type="button" class="add-btn" (click)="addMachineryRow()">+ Add Row</button>
+      </div>
+      <div class="color-legend">
+        <strong>Machineries Type:</strong>
+        <span class="legend-item"><span class="legend-swatch" style="background:#FCE4D6;border-color:#F4B183"></span>Estimation Wise</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#DDEBF7;border-color:#B4C7E7"></span>Direct</span>
+      </div>
+      <datalist id="machinery-options">@for (item of machineriesLookup(); track $index) {<option [value]="read(item, 'Description')"></option>}</datalist>
+      <datalist id="machinery-status-options">@for (item of machineryStatuses(); track $index) {<option [value]="read(item, 'StatusName')"></option>}</datalist>
+      <div class="table-scroll">
+        <table formArrayName="machineries">
+          <thead>
+            <tr>
+              <th>Sl</th><th>Machinery/Tools at Site</th><th>Est. Qty</th>
+              <th>Available at Site</th><th>No. Used at Site</th><th>No. of Days</th><th>No. Idle</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of machineries.controls; track row; let i = $index) {
+              <tr [formGroupName]="i" [style.background-color]="row.get('bgColor')?.value || null">
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td><input formControlName="machineryName" list="machinery-options" placeholder="Type to filter" (input)="onLookupTextChanged(row, 'machineryName', 'toolsAndEquipmentCode', $any($event.target).value, machineriesLookup(), ['ToolsAndEquipmentCode'], ['Description'])" /><input type="hidden" formControlName="toolsAndEquipmentCode" /></td>
+                <td><input type="number" formControlName="estimatedQuantity" readonly /></td>
+                <td><input type="number" formControlName="availableToolsOrMachineryAtSite" (change)="onMachineryAvailableChanged(i)" /></td>
+                <td><input type="number" class="key-input" formControlName="noOfMachineUsedAtSite" /></td>
+                <td><input type="number" formControlName="noOfDaysUsedAtSite" /></td>
+                <td><input type="number" formControlName="noOfMachineryIdleAtSite" /></td>
+                <td><input formControlName="statusName" list="machinery-status-options" placeholder="Type to filter" (input)="onLookupTextChanged(row, 'statusName', 'statusCode', $any($event.target).value, machineryStatuses(), ['StatusCode'], ['StatusName'])" /><input type="hidden" formControlName="statusCode" /></td>
+                <td><button type="button" class="remove-btn" (click)="removeMachineryRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            @if (machineries.length === 0) {
+              <tr><td colspan="8" class="empty">No rows yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+    }
+    <!-- ============ MANHOURS ============ -->
+    @if (activeTab() === 'manhours') {
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Employee Manhours</h3>
+        <button type="button" class="add-btn" (click)="addEmployeeHourRow()">+ Add Row</button>
+      </div>
+      <datalist id="employee-options">@for (employee of labourers(); track $index) {<option [value]="read(employee, 'EmpFullName')"></option>}</datalist>
+      <div class="table-scroll">
+        <table class="wide-table" formArrayName="employeeHours">
+          <thead>
+            <tr>
+              <th>✓</th><th>Sl No</th><th>Employee</th><th>Hrs</th><th>Basic</th>
+              <th>Normal Hrs</th><th>OT1</th><th>OT2</th><th>Total Hrs</th>
+              <th>Idle</th><th>Transport</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of employeeHours.controls; track row; let i = $index) {
+              <tr [formGroupName]="i">
+                <td><input class="row-check" type="checkbox" formControlName="chkYesNo" (change)="calculateDailySite()" /></td>
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td class="employee-cell">
+                  <input formControlName="employeeName" list="employee-options" placeholder="Type employee name" (input)="onLookupTextChanged(row, 'employeeName', 'employeeCode', $any($event.target).value, labourers(), ['EmployeeCode'], ['EmpFullName'])" /><input type="hidden" formControlName="employeeCode" />
+                </td>
+                <td><input type="number" class="key-input" formControlName="hrs" (change)="recalculateEmployeeRow(i)" /></td>
+                <td><input type="number" formControlName="basic" readonly /></td>
+                <td><input type="number" formControlName="normalHrs" readonly /></td>
+                <td><input type="number" formControlName="ot1" readonly /></td>
+                <td><input type="number" formControlName="ot2" readonly /></td>
+                <td><input type="number" formControlName="totalHrs" readonly /></td>
+                <td><input type="number" formControlName="idle" readonly /></td>
+                <td><input type="number" formControlName="transport" /></td>
+                <td><button type="button" class="remove-btn" (click)="removeEmployeeHourRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            @if (employeeHours.length === 0) {
+              <tr><td colspan="12" class="empty">No employee rows yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-layout">
+        <div class="summary-grid">
+          <div class="field"><label>Scope</label><input type="number" formControlName="scopeManhours" (input)="calculateDailySite()" /></div>
+          <div class="field"><label>Today</label><input type="number" formControlName="todayManhours" readonly /></div>
+          <div class="field"><label>Today %</label><input type="number" formControlName="todayManhoursPerc" readonly /></div>
+          <div class="field"><label>Previous</label><input type="number" formControlName="previousManhours" readonly /></div>
+          <div class="field"><label>Previous %</label><input type="number" formControlName="previousManhoursPerc" readonly /></div>
+          <div class="field"><label>Grand Total</label><input type="number" formControlName="grandTotalManhours" readonly /></div>
+          <div class="field"><label>Grand Total %</label><input type="number" formControlName="grandTotalManhoursPerc" readonly /></div>
+          <div class="field"><label>Balance</label><input type="number" formControlName="balanceManhours" readonly /></div>
+          <div class="field"><label>Balance %</label><input type="number" formControlName="balanceManhoursPerc" readonly /></div>
+          <div class="field"><label>Excess</label><input type="number" formControlName="excess" readonly /></div>
+          <div class="field"><label>Excess %</label><input type="number" formControlName="excessPerc" readonly /></div>
+        </div>
+
+        <div class="branch-hours">
+          <h3>Branch Hours</h3>
+          <div class="table-scroll">
+            <table formArrayName="branchHours">
+              <thead><tr><th>Sl No</th><th>Branch</th><th>Total Hrs</th><th></th></tr></thead>
+              <tbody>
+                @for (row of branchHours.controls; track row; let i = $index) {
+                  <tr [formGroupName]="i">
+                    <td>{{ row.get('slNo')?.value }}</td>
+                    <td><input formControlName="branchName" readonly /><input type="hidden" formControlName="branchCode" /></td>
+                    <td><input type="number" formControlName="totalHrs" readonly /></td>
+                    <td><button type="button" class="remove-btn" (click)="removeBranchHourRow(row.get('slNo')?.value)">✕</button></td>
+                  </tr>
+                }
+                @if (branchHours.length === 0) {
+                  <tr><td colspan="4" class="empty">No branch hours</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+    }
+  </form>
+</div>

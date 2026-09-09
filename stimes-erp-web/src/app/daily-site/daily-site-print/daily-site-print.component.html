@@ -1,0 +1,247 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <button type="button" (click)="print()">Print</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    @if (isPreview) {
+      <p class="preview-banner no-print">DEMO PREVIEW — unsaved data, not the saved record</p>
+    }
+    <h1 class="report-title">DAILY SITE REPORT</h1>
+
+    <!-- ============ HEADER INFO ============ -->
+    <table class="info-table">
+      <tr>
+        <td class="label">Doc No :</td><td>{{ rowValue(header(), 'DocNo') }}</td>
+        <td class="label">Date</td><td>{{ rowValue(header(), 'DocDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Rev No :</td><td>{{ rowValue(header(), 'DocNoRev') }}</td>
+        <td class="label">Start Date</td><td>{{ rowValue(header(), 'StartDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Client :</td><td>{{ rowValue(header(), 'CustomerName') }}</td>
+        <td class="label">Finish Date</td><td>{{ rowValue(header(), 'FinishDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Job No :</td><td>{{ rowValue(header(), 'JobNoAutoGen') }} {{ rowValue(header(), 'JobShortName') }}</td>
+        <td class="label">Start Time</td><td>{{ rowValue(header(), 'StartTime') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Location :</td><td>{{ rowValue(header(), 'Location') }}</td>
+        <td class="label">Close Time</td><td>{{ rowValue(header(), 'CloseTime') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Project :</td><td>{{ rowValue(header(), 'Project') }}</td>
+        <td class="label">Supervisor :</td><td>{{ rowValue(header(), 'SupervisorName') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Engineer :</td><td>{{ rowValue(header(), 'EngineerName') }}</td>
+        <td class="label">Materials received by :</td><td>{{ rowValue(header(), 'PreparedByName') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Scope of work :</td><td colspan="3">{{ rowValue(header(), 'abc') }}</td>
+      </tr>
+    </table>
+
+    <!-- ============ SCOPE OF WORK ============ -->
+    <h2 class="section-title">Description of Works</h2>
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th rowspan="2">S.No</th>
+            <th rowspan="2">Description of Works</th>
+            <th rowspan="2">Unit</th>
+            <th colspan="2">Completed Today</th>
+            <th colspan="2">Achieved Man rate</th>
+            <th rowspan="2">Our scope of works<br>As per job card</th>
+            <th rowspan="2">Total Area Completed<br>Until Today</th>
+            <th rowspan="2">Balance to<br>complete</th>
+          </tr>
+          <tr>
+            <th>Area Completed</th>
+            <th>Manhour Engaged Today</th>
+            <th>Today Achieved rate</th>
+            <th>Today Achieved rate<br>Mh/Sq.M for each activities</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of scopeOfWork(); track $index) {
+            <tr>
+              <td>{{ rowValue(row, 'SlNo') }}</td>
+              <td class="text-left">{{ rowValue(row, 'SurfacePreparationName') }}</td>
+              <td>{{ rowValue(row, 'UnitDesc') }}</td>
+              <td>{{ rowValue(row, 'AreaCompleted') }}</td>
+              <td>{{ rowValue(row, 'ManhourEngaged') }}</td>
+              <td>{{ rowValue(row, 'AchievedRate') }}</td>
+              <td>{{ rowValue(row, 'AchievedRateForEachActivity') }}</td>
+              <td>{{ rowValue(row, 'ScopeOfWorkAsPerJobCard') }}</td>
+              <td>{{ rowValue(row, 'TotalAreaCompleted') }}</td>
+              <td>{{ rowValue(row, 'BalanceToComplete') }}</td>
+            </tr>
+          }
+          @if (scopeOfWork().length === 0) {
+            <tr><td colspan="10" class="empty">No rows</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============ MATERIALS RECEIVED AT SITE ============ -->
+    <h2 class="section-title">Materials Received at Site</h2>
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>S.No</th>
+            <th>Materials Received at site</th>
+            <th>Units</th>
+            <th>Received</th>
+            <th>Today Consumed</th>
+            <th>Units</th>
+            <th>Balance &#64; stock</th>
+            <th>Rate of Application</th>
+            <th>Area Coverage</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of material(); track $index) {
+            <tr>
+              <td>{{ rowValue(row, 'SlNo') }}</td>
+              <td class="text-left">{{ rowValue(row, 'Description') }}</td>
+              <td>{{ rowValue(row, 'Units') }}</td>
+              <td>{{ rowValue(row, 'Received') }}</td>
+              <td>{{ rowValue(row, 'TodayConsumed') }}</td>
+              <td>{{ rowValue(row, 'Units1') }}</td>
+              <td>{{ rowValue(row, 'BalanceStock') }}</td>
+              <td>{{ rowValue(row, 'RateOfApplication') }}</td>
+              <td>{{ rowValue(row, 'AreaCoverage') }}</td>
+              <td>{{ rowValue(row, 'Remarks') }}</td>
+            </tr>
+          }
+          @if (material().length === 0) {
+            <tr><td colspan="10" class="empty">No rows</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ============ MANHOURS / CONSUMABLES / MACHINERIES ============ -->
+    <h2 class="section-title">Manhours / Consumables / Machineries</h2>
+    <div class="table-scroll">
+      <table class="grid-table manhours-table">
+        <colgroup>
+          <col style="width: 4%">
+          <col style="width: 18%">
+          <col style="width: 6%">
+          <col style="width: 6%">
+          <col style="width: 8%">
+          <col style="width: 16%">
+          <col style="width: 8%">
+          <col style="width: 16%">
+          <col style="width: 8%">
+          <col style="width: 10%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowspan="2">S.NO</th>
+            <th rowspan="2">Name</th>
+            <th rowspan="2">Hrs</th>
+            <th rowspan="2">Idle</th>
+            <th rowspan="2">Transport</th>
+            <th colspan="2">Consumables</th>
+            <th colspan="2">Machineries/Tools at site</th>
+            <th rowspan="2">Total days used</th>
+          </tr>
+          <tr>
+            <th>Quantity</th>
+            <th>Used Today</th>
+            <th>Quantity</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of consumablesOrMachineries(); track $index) {
+            <tr>
+              <td>{{ rowValue(row, 'SlNo') }}</td>
+              <td class="text-left">{{ rowValue(row, 'EmpFullName') }}</td>
+              <td>{{ rowValue(row, 'Hrs') }}</td>
+              <td>{{ rowValue(row, 'Idle') }}</td>
+              <td>{{ rowValue(row, 'Transport') }}</td>
+              <td class="text-left">{{ rowValue(row, 'ConsumableName') }}</td>
+              <td>{{ rowValue(row, 'ConsumableQuantity') }}</td>
+              <td class="text-left">{{ rowValue(row, 'ToolsAndEquipmentName') }}</td>
+              <td>{{ rowValue(row, 'MachineriesQuantity') }}</td>
+              <td>{{ rowValue(row, 'MachineriesUsed') }}</td>
+            </tr>
+          }
+          @if (consumablesOrMachineries().length === 0) {
+            <tr><td colspan="10" class="empty">No rows</td></tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="2">Total</td>
+            <td>{{ totals().hrs }}</td>
+            <td>{{ totals().idle }}</td>
+            <td>{{ totals().transport }}</td>
+            <td></td>
+            <td>{{ totals().consumableQuantity }}</td>
+            <td></td>
+            <td>{{ totals().machineriesQuantity }}</td>
+            <td>{{ totals().machineriesUsed }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ============ MANHOURS SUMMARY ============ -->
+    <h2 class="section-title">Manhours Summary</h2>
+    <table class="grid-table summary-table">
+      <thead>
+        <tr>
+          <th>Manhours</th>
+          <th>Scope</th>
+          <th>Today</th>
+          <th>Previous</th>
+          <th>Grand Total</th>
+          <th>Balance</th>
+          <th>Excess</th>
+          <th>Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td></td>
+          <td>{{ rowValue(header(), 'ScopeManhours') }}</td>
+          <td>{{ rowValue(header(), 'TodayManhours') }}</td>
+          <td>{{ rowValue(header(), 'PreviousManhours') }}</td>
+          <td>{{ rowValue(header(), 'GrandTotalManhours') }}</td>
+          <td>{{ rowValue(header(), 'BalanceManhours') }}</td>
+          <td>{{ rowValue(header(), 'Excess') }}</td>
+          <td>{{ rowValue(header(), 'Remarks') }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note">Note : All Sub stations/ big projects the value above 75 K should be filed in area wise - not in date wise</p>
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">SUPERVISOR / PROJECT MANAGER</div>
+        <div class="signature-line">NAME</div>
+        <div class="signature-line">SIGNATURE</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">PROJECT MANAGER</div>
+        <div class="signature-line">NAME</div>
+        <div class="signature-line">SIGNATURE</div>
+      </div>
+    </div>
+  }
+</div>

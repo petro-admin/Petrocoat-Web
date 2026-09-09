@@ -1,0 +1,106 @@
+<div class="erp-frame" [class.full-screen]="isFullScreen" [class.modules-open]="showModules">
+  <header class="topbar" [style.background]="branchColor()">
+    <button class="brand" type="button" (click)="goHome()" (mouseenter)="openModules()" (mouseleave)="scheduleCloseModules()" aria-label="Go to dashboard">
+      <img src="/assets/pc-logo-icon.png" alt="PC Holding" class="brand-icon" />
+      <span class="brand-word">
+        <img src="/assets/pc-logo-mark.png" alt="PC" class="brand-pc" />
+        <img src="/assets/pc-logo-holdings.png" alt="Holdings" class="brand-holdings" />
+      </span>
+    </button>
+
+    @if (settings.branchName()) {
+      <div class="branch-tag">[ {{ settings.branchName() | uppercase }} ]</div>
+    }
+
+    <div class="context"><span>Workspace</span><strong>{{ auth.currentUser()?.userName || 'ERP Workspace' }}</strong></div>
+    <div class="top-actions">
+      <button type="button" class="settings-button" title="Quick settings" (click)="showQuickSettings = !showQuickSettings"><span class="settings-symbol">&#9881;</span> Settings</button>
+      <button type="button" class="user-button" title="Logout" (click)="logout()"><span class="avatar">{{ (auth.currentUser()?.userName || 'U').charAt(0).toUpperCase() }}</span>{{ auth.currentUser()?.userName || 'User' }} <span class="caret">&#9662;</span></button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    @if (showModules) {
+    <aside class="sidebar" (mouseenter)="cancelCloseModules()" (mouseleave)="scheduleCloseModules()">
+      <p class="side-label">MODULES</p>
+      <nav>
+        @for (module of modules; track module.label) {
+          <button class="module" [class.selected]="activeModule === module.label" [class.disabled]="!module.available" type="button" (mouseenter)="selectModule(module.label)" (click)="selectModule(module.label)">
+            <span class="module-icon">{{ module.icon }}</span><span>{{ module.label }}</span>
+          </button>
+        }
+      </nav>
+      <div class="sidebar-footer"><span class="status-dot"></span>Connected to ERP</div>
+    </aside>
+
+    <aside class="module-panel" (mouseenter)="cancelCloseModules()" (mouseleave)="scheduleCloseModules()">
+      @if (activeModule) {
+        <p class="panel-kicker">{{ activeModule | uppercase }}</p>
+        <h2>{{ activeModule }}</h2>
+        <div class="detail-list">
+          @for (detail of activeModuleDetails; track detail) {
+            @if (activeModule === 'Operations' && detail === 'Activity') {
+              <button class="detail-link" type="button" (mouseenter)="selectActivity()" (click)="selectActivity()"><span class="detail-icon">AC</span>{{ detail }}<span>-></span></button>
+            } @else if (activeModule === 'Operations Activity' && detail === 'Daily Site') {
+              <a class="detail-link" routerLink="/daily-site" target="daily-site"><span class="detail-icon">DS</span>{{ detail }}<span>→</span></a>
+            } @else if (activeModule === 'Purchase' && detail === 'Activity') {
+              <button class="detail-link" type="button" (mouseenter)="selectPurchaseActivity()" (click)="selectPurchaseActivity()"><span class="detail-icon">AC</span>{{ detail }}<span>-></span></button>
+            } @else if (activeModule === 'Purchase Activity' && detail === 'Store Indent') {
+              <a class="detail-link" routerLink="/store-indent" target="store-indent"><span class="detail-icon">SI</span>{{ detail }}<span>→</span></a>
+            } @else {
+              <button class="detail-link staged" type="button"><span class="detail-icon">{{ detail.slice(0, 2).toUpperCase() }}</span>{{ detail }}<small>staged</small></button>
+            }
+          }
+        </div>
+      } @else {
+        <div class="panel-empty"><span>↗</span><p>Hover a module<br>to view its forms</p></div>
+      }
+    </aside>
+    }
+
+    <main class="content"><router-outlet /></main>
+    <app-confirm-dialog />
+  </div>
+
+  @if (showQuickSettings) {
+    <section class="quick-settings">
+      <div class="settings-heading"><strong>Quick settings</strong><button type="button" (click)="showQuickSettings = false">&times;</button></div>
+
+      @if (!settings.loaded()) {
+        <p class="settings-loading">Loading...</p>
+      } @else {
+        <label>Company</label>
+        <select [ngModel]="settings.companyCode()" (ngModelChange)="onCompanyChange($event)">
+          @for (company of settings.companies(); track rowValue(company, 'CompanyCode')) {
+            <option [value]="rowValue(company, 'CompanyCode')">{{ rowValue(company, 'CompanyName') }}</option>
+          }
+        </select>
+
+        <label>Branch</label>
+        <select [ngModel]="settings.branchCode()" (ngModelChange)="onBranchChange($event)">
+          @for (branch of settings.branches(); track rowValue(branch, 'BranchCode')) {
+            <option [value]="rowValue(branch, 'BranchCode')">{{ rowValue(branch, 'BranchName') }}</option>
+          }
+        </select>
+
+        <label>Financial period</label>
+        <select [ngModel]="settings.periodId()" (ngModelChange)="onPeriodChange($event)">
+          @for (period of settings.financialPeriods(); track rowValue(period, 'PeriodId')) {
+            <option [value]="rowValue(period, 'PeriodId')">{{ rowValue(period, 'FinancialPeriod') }}</option>
+          }
+        </select>
+
+        <label>Processing date</label>
+        <div class="select-value">{{ settings.processingDate() | date:'dd MMM yyyy' }}</div>
+
+        @if (settings.errorMessage()) {
+          <p class="settings-error">{{ settings.errorMessage() }}</p>
+        }
+
+        <button class="save-button" type="button" [disabled]="settings.saving()" (click)="saveSettings()">
+          {{ settings.saving() ? 'Saving...' : 'Save' }}
+        </button>
+      }
+    </section>
+  }
+</div>

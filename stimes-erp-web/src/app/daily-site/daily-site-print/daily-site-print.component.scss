@@ -1,0 +1,152 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  color: #1a1a1a;
+  background: #eee;
+}
+
+.print-page {
+  max-width: 29.7cm;
+  margin: 0 auto;
+  padding: 1cm;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+
+  button {
+    padding: 8px 20px;
+    border: 0;
+    border-radius: 6px;
+    background: #7a1f3d;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+.hint, .error { text-align: center; padding: 24px; }
+.error { color: #9f1c2e; }
+.preview-banner {
+  text-align: center;
+  background: #fff3cd;
+  color: #7a5c00;
+  border: 1px solid #ffe08a;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  margin-bottom: 10px;
+}
+
+.report-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 0 0 12px;
+  background: #b7dee8;
+  padding: 6px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 16px 0 4px;
+}
+
+table { border-collapse: collapse; width: 100%; }
+
+.info-table {
+  font-size: 11.5px;
+  margin-bottom: 8px;
+
+  td {
+    border: 1px solid #888;
+    padding: 3px 6px;
+  }
+  .label {
+    background: #b7dee8;
+    font-weight: 600;
+    white-space: nowrap;
+    width: 1%;
+  }
+}
+
+.table-scroll { overflow-x: auto; }
+
+.grid-table {
+  font-size: 10.5px;
+
+  th, td {
+    border: 1px solid #888;
+    padding: 3px 5px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  th {
+    background: #b7dee8;
+    font-weight: 600;
+  }
+  td.text-left { text-align: left; }
+  .empty { color: #888; font-style: italic; }
+
+  &.manhours-table {
+    table-layout: fixed;
+    td.text-left { word-break: break-word; white-space: normal; }
+  }
+
+  tfoot .totals-row td {
+    background: #eef5f8;
+    font-weight: 700;
+  }
+}
+
+.summary-table { max-width: 900px; }
+
+.note {
+  font-size: 10.5px;
+  font-style: italic;
+  margin: 8px 0;
+}
+
+.signature-block {
+  display: flex;
+  gap: 40px;
+  margin-top: 32px;
+}
+.signature-cell {
+  flex: 1;
+  font-size: 11px;
+
+  .signature-role {
+    background: #b7dee8;
+    font-weight: 700;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid #888;
+  }
+  .signature-line {
+    border: 1px solid #888;
+    border-top: none;
+    padding: 18px 6px 4px;
+  }
+}
+
+@media print {
+  :host { background: #fff; }
+  .print-page { max-width: none; padding: 0; margin: 0; }
+  .no-print { display: none !important; }
+  .table-scroll { overflow-x: visible; }
+
+  @page {
+    size: A4 landscape;
+    margin: 1cm;
+  }
+}

@@ -13,6 +13,9 @@ namespace StimesErp.Api.Services
         public int UserCode { get; set; }
         public string UserName { get; set; } = string.Empty;
         public int UCatCode { get; set; }
+        public int CompanyCode { get; set; }
+        public int BranchCode { get; set; }
+        public int PeriodId { get; set; }
     }
 
     public class AuthService

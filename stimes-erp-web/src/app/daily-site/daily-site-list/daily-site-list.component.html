@@ -1,0 +1,121 @@
+<div class="page">
+  <header>
+    <h2>Daily Site List</h2>
+    <div class="filters">
+      <select [(ngModel)]="selectedMonth" (change)="refresh()">
+        <option [value]="0">All Months</option>
+        @for (m of months; track m.value) {
+          <option [value]="m.value">{{ m.label }}</option>
+        }
+      </select>
+      <select [(ngModel)]="selectedYear" (change)="refresh()">
+        <option [value]="0">All Years</option>
+        @for (y of years; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+      <button (click)="openNew()">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p>Loading...</p>
+  }
+  @if (errorMessage()) {
+    <p class="error">{{ errorMessage() }}</p>
+  }
+
+  @if (!loading() && !errorMessage() && branchGroups().length === 0) {
+    <p class="empty">No records match your filters</p>
+  }
+
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Doc No</th>
+        <th>Doc Date</th>
+        <th>Job No</th>
+        <th>Project Details</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+      <tr class="filter-row">
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().docNo"
+                 (ngModelChange)="updateFilter('docNo', $event)" />
+        </th>
+        <th class="date-column">
+          <input type="date"
+                 [ngModel]="filters().docDate"
+                 (ngModelChange)="updateFilter('docDate', $event)" />
+        </th>
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().jobDesc"
+                 (ngModelChange)="updateFilter('jobDesc', $event)" />
+        </th>
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().project"
+                 (ngModelChange)="updateFilter('project', $event)" />
+        </th>
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().status"
+                 (ngModelChange)="updateFilter('status', $event)" />
+        </th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (branch of branchGroups(); track branch.key) {
+        <tr class="group-row branch-group" (click)="toggle(branch.key)">
+          <td colspan="6">
+            <span class="chevron" [class.collapsed]="isCollapsed(branch.key)">▾</span>
+            {{ branch.label }}
+          </td>
+        </tr>
+
+        @if (!isCollapsed(branch.key)) {
+          @for (division of branch.divisionGroups; track division.key) {
+            <tr class="group-row division-group" (click)="toggle(division.key)">
+              <td colspan="6">
+                <span class="chevron" [class.collapsed]="isCollapsed(division.key)">▾</span>
+                {{ division.label }}
+              </td>
+            </tr>
+
+            @if (!isCollapsed(division.key)) {
+              @for (jobDesc of division.jobDescGroups; track jobDesc.key) {
+                <tr class="group-row jobdesc-group" [class.status-green]="jobDesc.isGreen" (click)="toggle(jobDesc.key)">
+                  <td colspan="6">
+                    <span class="chevron" [class.collapsed]="isCollapsed(jobDesc.key)">▾</span>
+                    {{ jobDesc.label }}
+                  </td>
+                </tr>
+
+                @if (!isCollapsed(jobDesc.key)) {
+                  @for (row of jobDesc.rows; track rowValue(row, 'DailySiteCode')) {
+                    <tr class="data-row" (click)="open(row)">
+                      <td>{{ rowValue(row, 'DocNo') }}</td>
+                      <td class="date-column">{{ rowValue(row, 'DocDate') | date:'dd-MM-yyyy' }}</td>
+                      <td>{{ rowValue(row, 'JobDesc') }}</td>
+                      <td>{{ rowValue(row, 'Project') }}</td>
+                      <td>{{ rowValue(row, 'PStatus') }}</td>
+                      <td class="actions-column">
+                        <button type="button" class="delete-btn" (click)="deleteRow(row, $event)">Delete</button>
+                      </td>
+                    </tr>
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    </tbody>
+  </table>
+  </div>
+</div>

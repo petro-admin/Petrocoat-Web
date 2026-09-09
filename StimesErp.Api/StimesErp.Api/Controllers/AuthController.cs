@@ -9,7 +9,7 @@ using StimesErp.Api.Services;
 namespace StimesErp.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     public class AuthController : ControllerBase
     {
         private readonly AuthService _authService;

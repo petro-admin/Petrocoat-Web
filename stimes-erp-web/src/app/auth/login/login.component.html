@@ -1,0 +1,53 @@
+<main class="login-wrap">
+  <section class="hero">
+    <img class="hero-img" src="/assets/pc-holding-banner.png" alt="PC Holding — Experts in epoxy and protective coating solutions" />
+  </section>
+
+  <section class="login-panel">
+    <div class="panel-inner">
+      <div class="brandmark">
+        <img src="/assets/pc-logo-icon.png" alt="PC Holding" class="logo-icon" />
+        <div class="brand-logo">
+          <img src="/assets/pc-logo-mark.png" alt="PC" class="logo-pc" />
+          <img src="/assets/pc-logo-holdings.png" alt="Holdings" class="logo-holdings" />
+        </div>
+        <span class="brand-tagline">BUILDING &nbsp;|&nbsp; PROTECTING &nbsp;|&nbsp; EXCELLING</span>
+      </div>
+
+      <form class="login-card" [formGroup]="form" (ngSubmit)="submit()">
+        <h1>Login</h1>
+        <p class="subtitle">Enter your credentials to access the ERP</p>
+
+        <label for="username">Username</label>
+        <input id="username" type="text" formControlName="username" autocomplete="username" placeholder="Enter username" />
+        @if (usernameControl?.touched && usernameControl?.invalid) {
+          <span class="field-error">Username is required</span>
+        }
+
+        <label for="password">Password</label>
+        <div class="password-row">
+          <input id="password" [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" placeholder="Password" />
+          <button type="button" class="toggle-btn" (click)="togglePassword()">
+            {{ showPassword() ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+        @if (passwordControl?.touched && passwordControl?.invalid) {
+          <span class="field-error">Password is required</span>
+        }
+
+        @if (errorMessage()) {
+          <p class="error">{{ errorMessage() }}</p>
+        }
+
+        <button type="submit" class="submit-btn" [disabled]="loading()">
+          {{ loading() ? 'Signing in...' : 'Login' }}
+        </button>
+      </form>
+
+      <div class="powered-by">
+        <span>Powered by</span>
+        <strong>XCED</strong>
+      </div>
+    </div>
+  </section>
+</main>

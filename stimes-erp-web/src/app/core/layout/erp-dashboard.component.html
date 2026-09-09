@@ -1,0 +1,197 @@
+<section class="dashboard" aria-label="ERP workspace">
+  <header class="dashboard-header">
+    <div>
+      <p class="eyebrow">Overview</p>
+      <h1>Dashboard</h1>
+      <p class="welcome">Welcome back{{ userName() ? ', ' + userName() : '' }}</p>
+    </div>
+
+    @if (isAdmin()) {
+      <form class="filter-bar" (ngSubmit)="applyFilter()">
+        <div class="branch-picker" #branchPicker>
+          <span class="branch-picker-caption">Branch</span>
+          <button type="button" class="branch-picker-toggle" (click)="toggleBranchDropdown()">
+            {{ branchFilterLabel() }}
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          @if (branchDropdownOpen()) {
+            <div class="branch-dropdown">
+              <button type="button" class="branch-option all" (click)="selectAllBranches()">
+                <span>All Branches</span>
+              </button>
+              @for (b of branches(); track b.branchCode) {
+                <label class="branch-option">
+                  <input type="checkbox" [checked]="isBranchSelected(b.branchCode)" (change)="toggleBranch(b.branchCode)" />
+                  <span>{{ b.branchName }}</span>
+                </label>
+              }
+              @if (branchSelectionError()) {
+                <p class="branch-selection-error">{{ branchSelectionError() }}</p>
+              }
+            </div>
+          }
+        </div>
+
+        <label>
+          <span>Department</span>
+          <select (change)="onDepartmentChange($any($event.target).value)">
+            <option value="">All Departments</option>
+            @for (d of departments(); track d.departmentCode) {
+              <option [value]="d.departmentCode">{{ d.departmentName }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          <span>From</span>
+          <input type="date" [(ngModel)]="fromDate" name="fromDate" />
+        </label>
+        <label>
+          <span>To</span>
+          <input type="date" [(ngModel)]="toDate" name="toDate" />
+        </label>
+        <button type="submit" [disabled]="loading()">{{ loading() ? 'Loading...' : 'Apply' }}</button>
+      </form>
+    }
+  </header>
+
+  @if (!isAdmin()) {
+    <div class="restricted-panel">
+      <h2>Welcome{{ userName() ? ', ' + userName() : '' }}</h2>
+      <p>The full analytics dashboard is available to administrators only. Use the sidebar to get to your modules.</p>
+    </div>
+  }
+
+  @if (loading() && !kpis()) { <p class="hint">Loading dashboard...</p> }
+  @if (error()) { <p class="error">{{ error() }}</p> }
+  @if (kpis()?.currencyWarning) {
+    <p class="currency-warning">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {{ kpis()!.currencyWarning }}
+    </p>
+  }
+
+  @if (kpis(); as data) {
+    <div class="dashboard-body" [class.is-loading]="loading()">
+    @if (loading()) {
+      <div class="loading-overlay">
+        <span class="spinner"></span>
+        <span>Refreshing...</span>
+      </div>
+    }
+    <div class="kpi-grid">
+      <div class="kpi-card sales">
+        <div class="kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Sales Invoice</span>
+          <span class="kpi-value">{{ formatCurrency(data.salesInvoice.totalValue) }}</span>
+          <span class="kpi-sub">{{ data.salesInvoice.count }} invoices</span>
+        </div>
+      </div>
+
+      <div class="kpi-card purchase">
+        <div class="kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.6a2 2 0 0 0 2-1.6L21 8H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="21" r="1.4" fill="currentColor"/><circle cx="18" cy="21" r="1.4" fill="currentColor"/></svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Purchase Invoice</span>
+          <span class="kpi-value">{{ formatCurrency(data.purchaseInvoice.totalValue) }}</span>
+          <span class="kpi-sub">{{ data.purchaseInvoice.count }} invoices</span>
+        </div>
+      </div>
+
+      <div class="kpi-card stock">
+        <div class="kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 7v10l9 4 9-4V7M12 11v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Stock Value</span>
+          <span class="kpi-value">{{ formatCurrency(data.stockValue.totalValue) }}</span>
+          <span class="kpi-sub">{{ data.stockValue.itemCount }} items</span>
+        </div>
+      </div>
+
+      <div class="kpi-card followup">
+        <div class="kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 3v4M12 3h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Sales Followup Booked</span>
+          <span class="kpi-value">{{ formatCurrency(data.salesFollowup.bookedAmount) }}</span>
+          <span class="kpi-sub">{{ data.salesFollowup.bookedCount }} orders</span>
+        </div>
+      </div>
+
+      <div class="kpi-card attendance">
+        <div class="kpi-icon">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="7" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16.5 8.5l1.6 1.6 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-label">Attendance</span>
+          <span class="kpi-value">{{ data.attendance.attendancePercent }}%</span>
+          <span class="kpi-sub">
+            @if (data.attendance.asOfDate) {
+              As of {{ data.attendance.asOfDate }}
+            } @else {
+              No attendance marked yet
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat">
+        <span class="stat-value">{{ data.salesActivity.enquiryCount }}</span>
+        <span class="stat-label">Enquiries</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ data.salesActivity.siteVisitCount }}</span>
+        <span class="stat-label">Site Visits</span>
+      </div>
+      <div class="stat divider"></div>
+      <div class="stat">
+        <span class="stat-value">{{ data.workforce.totalEmployeeCount }}</span>
+        <span class="stat-label">Employees</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ data.workforce.staffCount }}</span>
+        <span class="stat-label">Staff</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ data.workforce.driverCount }}</span>
+        <span class="stat-label">Drivers</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ data.workforce.labourCount }}</span>
+        <span class="stat-label">Labour</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ data.workforce.subContractCount }}</span>
+        <span class="stat-label">Subcontractors</span>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <div class="chart-panel-header">
+          <h2>Sales &amp; Purchase Trend</h2>
+          <p>Monthly comparison for the selected period</p>
+        </div>
+        <div class="chart-box"><canvas #trendCanvas></canvas></div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="chart-panel-header">
+          <h2>Attendance Breakdown</h2>
+          <p>Present, absent and on-leave counts</p>
+        </div>
+        <div class="chart-box"><canvas #attendanceCanvas></canvas></div>
+      </div>
+    </div>
+    </div>
+  }
+</section>

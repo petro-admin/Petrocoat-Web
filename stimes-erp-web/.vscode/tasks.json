@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "start backend",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["run", "--project", "stimes-erp-web/backend/StimesErp.Api"],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "start frontend",
+      "type": "npm",
+      "script": "start",
+      "path": "package.json",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc-watch",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "(Starting|Re-optimizing)",
+          "endsPattern": "(compiled successfully|Application bundle generation complete)"
+        }
+      },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "start STIMES ERP",
+      "dependsOn": ["start backend", "start frontend"],
+      "dependsOrder": "parallel",
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

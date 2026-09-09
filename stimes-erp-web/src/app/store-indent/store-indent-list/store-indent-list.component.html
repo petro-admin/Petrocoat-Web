@@ -1,0 +1,116 @@
+<div class="page">
+  <header>
+    <h2>Store Indent</h2>
+    <div class="filters">
+      <select [(ngModel)]="selectedMonth" (change)="refresh()">
+        <option [value]="0">All Months</option>
+        @for (m of months; track m.value) {
+          <option [value]="m.value">{{ m.label }}</option>
+        }
+      </select>
+      <select [(ngModel)]="selectedYear" (change)="refresh()">
+        <option [value]="0">All Years</option>
+        @for (y of years; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+      <button (click)="openNew()" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p>Loading...</p>
+  }
+  @if (errorMessage()) {
+    <p class="error">{{ errorMessage() }}</p>
+  }
+
+  @if (!loading() && !errorMessage() && statusGroups().length === 0) {
+    <p class="empty">No records match your filters</p>
+  }
+
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>RQN No</th>
+        <th>RQN Date</th>
+        <th>Details</th>
+        <th>Type</th>
+        <th></th>
+      </tr>
+      <tr class="filter-row">
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().docNo"
+                 (ngModelChange)="updateFilter('docNo', $event)" />
+        </th>
+        <th class="date-column">
+          <input type="date"
+                 [ngModel]="filters().docDate"
+                 (ngModelChange)="updateFilter('docDate', $event)" />
+        </th>
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().details"
+                 (ngModelChange)="updateFilter('details', $event)" />
+        </th>
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().type"
+                 (ngModelChange)="updateFilter('type', $event)" />
+        </th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (status of statusGroups(); track status.key) {
+        <tr class="group-row status-group" (click)="toggle(status.key)">
+          <td colspan="5">
+            <span class="chevron" [class.collapsed]="isCollapsed(status.key)">▾</span>
+            {{ status.label }}
+          </td>
+        </tr>
+
+        @if (!isCollapsed(status.key)) {
+          @for (branch of status.branchGroups; track branch.key) {
+            <tr class="group-row branch-group" (click)="toggle(branch.key)">
+              <td colspan="5">
+                <span class="chevron" [class.collapsed]="isCollapsed(branch.key)">▾</span>
+                {{ branch.label }}
+              </td>
+            </tr>
+
+            @if (!isCollapsed(branch.key)) {
+              @for (customer of branch.customerGroups; track customer.key) {
+                <tr class="group-row customer-group" (click)="toggle(customer.key)">
+                  <td colspan="5">
+                    <span class="chevron" [class.collapsed]="isCollapsed(customer.key)">▾</span>
+                    {{ customer.label }}
+                  </td>
+                </tr>
+
+                @if (!isCollapsed(customer.key)) {
+                  @for (row of customer.rows; track rowValue(row, 'Code')) {
+                    <tr class="data-row" [style.background-color]="rowValue(row, 'BgColour') || rowValue(row, 'BgColor') || null" (click)="open(row)">
+                      <td>{{ rowValue(row, 'PurReqnNo') }}</td>
+                      <td class="date-column">{{ rowValue(row, 'PReqnDate') | date:'dd-MM-yyyy' }}</td>
+                      <td>{{ rowValue(row, 'ReqnDetails') }}</td>
+                      <td>{{ rowValue(row, 'RequisitionType') }}</td>
+                      <td class="actions-column">
+                        @if (rights().delete && rowValue(row, 'Status')?.toUpperCase() !== 'APPROVED') {
+                          <button type="button" class="delete-btn" (click)="deleteRow(row, $event)">Delete</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    </tbody>
+  </table>
+  </div>
+</div>

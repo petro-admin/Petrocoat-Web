@@ -1,0 +1,84 @@
+:host { display: block; min-height: 100vh; }
+.erp-frame { min-height: 100vh; background: #f4f1eb; color: #263b3b; }
+.topbar { height: 68px; display: flex; align-items: center; gap: 28px; padding: 0 28px; background: #fffdf9; border-bottom: 1px solid #dce2dd; position: relative; z-index: 2; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: #263b3b; cursor: pointer; text-align: left; }
+.brand-icon { height: 40px; width: auto; }
+.brand-word { display: flex; align-items: center; gap: 5px; }
+.brand-pc, .brand-holdings { height: 15px; width: auto; }
+.module-icon { display: grid; place-items: center; background: #263b3b; color: #f4f1eb; font-weight: 800; }
+.branch-tag { color: #1a1a1a; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.context { border-left: 1px solid #dce2dd; padding-left: 28px; display: grid; gap: 2px; font-size: 12px; }
+.context span { color: #899390; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.top-actions { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.settings-button, .user-button { border: 0; background: transparent; color: #263b3b; cursor: pointer; }
+.settings-button { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.settings-symbol { font-size: 18px; }
+.user-button { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.avatar { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #dbe6df; font-weight: 700; }
+.caret { color: #899390; font-size: 10px; }
+
+.workspace { display: flex; min-height: calc(100vh - 68px); }
+
+// Sidebar and module-panel float above the content as a transient flyout - same as the desktop
+// app's hover flyout - instead of permanently sharing layout space with whatever form is open.
+.sidebar {
+  position: fixed;
+  top: 68px;
+  left: 0;
+  bottom: 0;
+  width: 220px;
+  z-index: 10;
+  padding: 26px 14px 18px;
+  background: #263b3b;
+  color: #e6ece7;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 6px 0 24px rgba(0, 0, 0, .18);
+  overflow-y: auto;
+}
+.side-label { margin: 0 12px 14px; color: #8fa5a0; font-size: 10px; letter-spacing: 1.5px; }
+nav { display: grid; gap: 4px; }
+.module { display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 12px; border: 0; border-left: 3px solid transparent; background: transparent; color: #d7e0dc; text-decoration: none; text-align: left; font-size: 13px; cursor: pointer; }
+.module:hover, .module.selected { background: #334c4b; border-left-color: #e18a6f; color: white; }
+.module-icon { width: 24px; height: 24px; flex: 0 0 24px; background: #405955; font-size: 11px; }
+.module.disabled { color: #839692; cursor: not-allowed; }
+.module.disabled .module-icon { background: #304845; color: #839692; }
+.module em { margin-left: auto; color: #78908a; font-size: 9px; font-style: normal; }
+.sidebar-footer { margin-top: auto; color: #8fa5a0; font-size: 10px; padding: 14px 12px 0; border-top: 1px solid #3a5351; }
+.status-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #8bc49b; }
+.content { flex: 1; min-width: 0; width: 100%; }
+.module-panel {
+  position: fixed;
+  top: 68px;
+  left: 220px;
+  bottom: 0;
+  width: 230px;
+  z-index: 10;
+  padding: 38px 20px;
+  background: #fffdf9;
+  border-right: 1px solid #dce2dd;
+  box-shadow: 6px 0 24px rgba(0, 0, 0, .12);
+  overflow-y: auto;
+}
+.panel-kicker { margin: 0; color: #bf5b3f; font-size: 10px; letter-spacing: 1.7px; font-weight: 800; }
+.module-panel h2 { margin: 9px 0 28px; font: 500 28px Georgia, serif; }
+.panel-empty { height: 100%; display: grid; place-content: center; color: #98a49f; text-align: center; }
+.panel-empty span { color: #bf5b3f; font-size: 34px; }
+.panel-empty p { line-height: 1.5; }
+.detail-list { display: grid; gap: 7px; }
+.detail-link { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 8px; border: 0; background: transparent; color: #263b3b; text-decoration: none; text-align: left; font-size: 12px; cursor: pointer; }
+.detail-link:hover { background: #e9dfd2; }
+.detail-link > span:last-child { margin-left: auto; color: #bf5b3f; }
+.detail-icon { width: 26px; height: 26px; display: grid; place-items: center; background: #e5ece7; font-size: 9px; font-weight: 700; }
+.detail-link small { margin-left: auto; color: #9ba6a2; font-size: 9px; }
+.quick-settings { position: fixed; z-index: 4; top: 68px; right: 0; width: 280px; min-height: 300px; padding: 20px; background: #fffdf9; border-left: 1px solid #dce2dd; border-bottom: 1px solid #dce2dd; box-shadow: -8px 12px 24px rgba(38,59,59,.1); }
+.settings-heading { display: flex; justify-content: space-between; margin-bottom: 22px; }
+.settings-heading button { border: 0; background: none; font-size: 22px; cursor: pointer; }
+.quick-settings label { display: block; margin: 14px 0 6px; color: #72807c; font-size: 11px; }
+.quick-settings select { width: 100%; padding: 9px 10px; border: 1px solid #dce2dd; font-size: 12px; background: #fff; color: #263b3b; box-sizing: border-box; }
+.select-value { display: flex; justify-content: space-between; padding: 10px; border: 1px solid #dce2dd; font-size: 12px; }
+.settings-loading { color: #72807c; font-size: 12px; }
+.settings-error { margin-top: 12px; color: #c0392b; font-size: 11px; }
+.save-button { margin-top: 20px; padding: 10px 18px; border: 0; background: #bf5b3f; color: #fff; cursor: pointer; }
+.save-button:disabled { opacity: 0.6; cursor: not-allowed; }
+@media (max-width: 700px) { .topbar { padding: 0 16px; } .context { display: none; } .sidebar { width: 64px; padding: 20px 8px; } .module-panel { left: 64px; width: 220px; } .side-label, .module span:not(.module-icon), .module em, .sidebar-footer { display: none; } .module { justify-content: center; padding: 10px 0; } .module-icon { width: 32px; height: 32px; } }

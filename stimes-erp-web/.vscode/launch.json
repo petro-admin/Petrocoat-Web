@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ng serve",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "STIMES API",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/stimes-erp-web/backend/StimesErp.Api/bin/Debug/net8.0/StimesErp.Api.dll",
+      "cwd": "${workspaceFolder}/stimes-erp-web/backend/StimesErp.Api"
+    },
+    {
+      "name": "Launch Chrome against localhost:4200",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:4200",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "STIMES ERP (Frontend + API)",
+      "configurations": ["ng serve", "STIMES API"],
+      "stopAll": true
+    }
+  ]
+}

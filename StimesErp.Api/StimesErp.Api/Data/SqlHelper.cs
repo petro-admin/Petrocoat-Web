@@ -83,7 +83,13 @@ namespace StimesErp.Api.Data
         }
 
         /// <summary>Table-valued parameter, equivalent to DBAccessHelper.SetTableValuedParameter used for
-        /// dtScopeOfWork / dtMaterial / dtConsumablesAndMachineries etc.</summary>
+        /// dtScopeOfWork / dtMaterial / dtConsumablesAndMachineries etc.
+        /// `table` must be a real DataTable (possibly zero rows) whose columns match the target UDT's
+        /// actual schema exactly - unlike the desktop app's older System.Data.SqlClient, this driver
+        /// (Microsoft.Data.SqlClient) throws "Table-valued parameters cannot be DBNull" if null/DBNull
+        /// is passed, and separately validates column count/order against the UDT even for zero rows.
+        /// So where desktop passes a literal `null` for an unused table param, pass an empty DataTable
+        /// built with that UDT's real columns instead (check via sys.table_types if unsure).</summary>
         public static SqlParameter TableParam(string name, string udtTypeName, DataTable table)
         {
             return new SqlParameter(name, SqlDbType.Structured)

@@ -1,0 +1,322 @@
+<div class="page">
+  <div class="topbar">
+    <div>
+      <h2>{{ isNew ? 'New Store Indent' : 'Edit Store Indent' }}</h2>
+      <span class="docno" *ngIf="form.get('requisitionNo')?.value as dn">{{ dn }}</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="secondary" type="button" (click)="cancel()">Cancel</button>
+      <button class="primary" type="button" [disabled]="saving() || !canSave()" [title]="!canSave() ? (isApproved() ? 'Approved - cannot be updated' : 'You do not have permission to add') : ''" (click)="save()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="tabs">
+    @for (t of tabs(); track t.key) {
+      <button type="button" class="tab-btn" [class.active]="activeTab() === t.key" (click)="activeTab.set(t.key)">
+        {{ t.label }}
+      </button>
+    }
+  </div>
+
+  <form [formGroup]="form">
+
+    <!-- ============ BASIC DETAILS ============ -->
+    <section class="card" [hidden]="activeTab() !== 'basic'">
+      <div class="grid-2">
+        <div class="field">
+          <label>SIN No</label>
+          <input formControlName="requisitionNo" />
+        </div>
+        <div class="field">
+          <label>Date *</label>
+          <input type="date" formControlName="requisitionDate" />
+        </div>
+
+        <div class="field">
+          <label>Type</label>
+          <div class="radio-row">
+            <label class="radio-label"><input type="radio" name="requisitionType" value="GEN" [checked]="form.get('requisitionType')?.value === 'GEN'" (change)="onRequisitionTypeChanged('GEN')" /> General</label>
+            <label class="radio-label"><input type="radio" name="requisitionType" value="PRO" [checked]="form.get('requisitionType')?.value === 'PRO'" (change)="onRequisitionTypeChanged('PRO')" /> Project</label>
+          </div>
+        </div>
+
+        @if (!isProjectMode()) {
+          <div class="field">
+            <label>Sub Type</label>
+            <div class="radio-row">
+              <label class="radio-label"><input type="radio" name="requisitionSubType" value="OTH" [checked]="form.get('requisitionSubType')?.value === 'OTH'" (change)="onRequisitionSubTypeChanged('OTH')" /> Others</label>
+              <label class="radio-label"><input type="radio" name="requisitionSubType" value="INH" [checked]="form.get('requisitionSubType')?.value === 'INH'" (change)="onRequisitionSubTypeChanged('INH')" /> Inhouse</label>
+            </div>
+          </div>
+        }
+
+        <div class="field">
+          <label>Cost Center</label>
+          <app-filter-select formControlName="costId" [options]="costCenters()" valueKey="CostId" labelKey="CostName"></app-filter-select>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-label"><input type="checkbox" formControlName="active" /> Active</label>
+        </div>
+
+        @if (!isInhouseSubType()) {
+          <div class="field">
+            <label>Sales Order No</label>
+            <app-filter-select formControlName="jobCode" [options]="salesOrders()" valueKey="SOCode" labelKey="SONo" (valueChange)="onSalesOrderChanged()"></app-filter-select>
+            <small class="field-hint" *ngIf="salesOrders().length === 0">No sales orders available</small>
+          </div>
+          <div class="field">
+            <label>Project Details</label>
+            <input formControlName="requisitionDetails" />
+          </div>
+          <div class="field">
+            <label>Ref No</label>
+            <input formControlName="refNo" />
+          </div>
+        } @else {
+          <div class="field">
+            <label>Employee</label>
+            <app-filter-select formControlName="employeeCode" [options]="employees()" valueKey="EmployeeCode" labelKey="EmpFullName" (valueChange)="onEmployeeChanged($event)"></app-filter-select>
+          </div>
+          <div class="field">
+            <label>Designation</label>
+            <input formControlName="designation" />
+          </div>
+          <div class="field">
+            <label>Requested Status</label>
+            <app-filter-select formControlName="requestedStatus" [options]="requestedStatuses()" valueKey="StatusCode" labelKey="StatusName"></app-filter-select>
+          </div>
+        }
+
+        <div class="field">
+          <label>Created By</label>
+          <app-filter-select formControlName="createdByECode" [options]="users()" valueKey="UserCode" labelKey="UserName"></app-filter-select>
+        </div>
+        <div class="field">
+          <label>Checked By</label>
+          <app-filter-select formControlName="checkedByECode" [options]="users()" valueKey="UserCode" labelKey="UserName"></app-filter-select>
+        </div>
+        <div class="field">
+          <label>Approved By</label>
+          <app-filter-select formControlName="approvedByECode" [options]="users()" valueKey="UserCode" labelKey="UserName"></app-filter-select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GENERAL (General mode) ============ -->
+    @if (!isProjectMode()) {
+      <section class="card" [hidden]="activeTab() !== 'general'">
+        <div class="grid-toolbar">
+          <h3>General</h3>
+          <button type="button" class="add-btn" (click)="addGeneralRow()">+ Add Row</button>
+        </div>
+        <div class="table-scroll">
+          <table formArrayName="general">
+            <thead>
+              <tr>
+                <th>Sl</th><th>Type</th><th>Status</th><th>Item Name</th><th>Uom</th>
+                <th>Available Qty</th><th>Requested Qty</th><th>Issued Qty</th><th>Remarks</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of general.controls; track row; let i = $index) {
+                <tr [formGroupName]="i">
+                  <td>{{ row.get('slNo')?.value }}</td>
+                  <td>
+                    <select formControlName="typeCode" (change)="onGeneralTypeChanged(i)">
+                      <option [ngValue]="null">-Select-</option>
+                      <option [ngValue]="1">Material</option>
+                      <option [ngValue]="2">Consumable</option>
+                      <option [ngValue]="3">Tools and Equipment</option>
+                      <option [ngValue]="4">Services</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select formControlName="statusCode" (change)="onGeneralStatusChanged(i)">
+                      <option [ngValue]="1">New</option>
+                      <option [ngValue]="2">Exist</option>
+                    </select>
+                  </td>
+                  <td>
+                    @if (row.get('statusCode')?.value === 1) {
+                      <input formControlName="descriptionNew" placeholder="Item name" />
+                    } @else {
+                      <input formControlName="itemName" list="general-item-options" placeholder="Type to filter"
+                             (focus)="loadGeneralItemOptions(row.get('typeCode')?.value)"
+                             (change)="onGeneralItemChanged(i, $any($event.target).value)" />
+                    }
+                  </td>
+                  <td>
+                    <app-filter-select formControlName="unitCode" [options]="units()" valueKey="UnitCode" labelKey="UnitDesc"></app-filter-select>
+                  </td>
+                  <td><input type="number" formControlName="stockQty" readonly /></td>
+                  <td><input type="number" formControlName="requestedQty" /></td>
+                  <td><input type="number" formControlName="issuedQty" /></td>
+                  <td><input formControlName="remarks" /></td>
+                  <td><button type="button" class="remove-btn" (click)="removeGeneralRow(row.get('slNo')?.value)">✕</button></td>
+                </tr>
+              }
+              @if (general.length === 0) {
+                <tr><td colspan="10" class="empty">No rows yet — click "Add Row"</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <datalist id="general-item-options">@for (item of generalItemOptions(); track $index) {<option [value]="rowValue(item, 'Description')"></option>}</datalist>
+      </section>
+    }
+
+    <!-- ============ MATERIAL / CONSUMABLE / TOOLS & EQUIPMENT (Project mode) ============ -->
+    @if (isProjectMode()) {
+      <section class="card" [hidden]="activeTab() !== 'material'">
+        <div class="grid-toolbar"><h3>Materials</h3></div>
+        <div class="table-scroll">
+          <table formArrayName="material">
+            <thead><tr><th>Sl</th><th>Item Name</th><th>Uom</th><th>Available Qty</th><th>Requested Qty</th><th>Issued Qty</th><th>Remarks</th><th></th></tr></thead>
+            <tbody>
+              @for (row of material.controls; track row; let i = $index) {
+                <tr [formGroupName]="i">
+                  <td>{{ row.get('slNo')?.value }}</td>
+                  <td><input formControlName="itemName" readonly /></td>
+                  <td>
+                    <app-filter-select formControlName="unitCode" [options]="units()" valueKey="UnitCode" labelKey="UnitDesc"></app-filter-select>
+                  </td>
+                  <td><input type="number" formControlName="stockQty" readonly /></td>
+                  <td><input type="number" formControlName="requestedQty" /></td>
+                  <td><input type="number" formControlName="issuedQty" /></td>
+                  <td><input formControlName="remarks" /></td>
+                  <td><button type="button" class="remove-btn" (click)="removeItemRow(material, row.get('slNo')?.value)">✕</button></td>
+                </tr>
+              }
+              @if (material.length === 0) {
+                <tr><td colspan="8" class="empty">No estimated materials for this Sales Order</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" [hidden]="activeTab() !== 'consumable'">
+        <div class="grid-toolbar"><h3>Consumable</h3></div>
+        <div class="table-scroll">
+          <table formArrayName="consumable">
+            <thead><tr><th>Sl</th><th>Item Name</th><th>Uom</th><th>Available Qty</th><th>Requested Qty</th><th>Issued Qty</th><th>Remarks</th><th></th></tr></thead>
+            <tbody>
+              @for (row of consumable.controls; track row; let i = $index) {
+                <tr [formGroupName]="i">
+                  <td>{{ row.get('slNo')?.value }}</td>
+                  <td><input formControlName="itemName" readonly /></td>
+                  <td>
+                    <app-filter-select formControlName="unitCode" [options]="units()" valueKey="UnitCode" labelKey="UnitDesc"></app-filter-select>
+                  </td>
+                  <td><input type="number" formControlName="stockQty" readonly /></td>
+                  <td><input type="number" formControlName="requestedQty" /></td>
+                  <td><input type="number" formControlName="issuedQty" /></td>
+                  <td><input formControlName="remarks" /></td>
+                  <td><button type="button" class="remove-btn" (click)="removeItemRow(consumable, row.get('slNo')?.value)">✕</button></td>
+                </tr>
+              }
+              @if (consumable.length === 0) {
+                <tr><td colspan="8" class="empty">No estimated consumables for this Sales Order</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" [hidden]="activeTab() !== 'tae'">
+        <div class="grid-toolbar"><h3>Tools and Equipment</h3></div>
+        <div class="table-scroll">
+          <table formArrayName="tae">
+            <thead><tr><th>Sl</th><th>Tool Name</th><th>Uom</th><th>Available Qty</th><th>Requested Qty</th><th>Issued Qty</th><th>Remarks</th><th></th></tr></thead>
+            <tbody>
+              @for (row of tae.controls; track row; let i = $index) {
+                <tr [formGroupName]="i">
+                  <td>{{ row.get('slNo')?.value }}</td>
+                  <td><input formControlName="itemName" readonly /></td>
+                  <td>
+                    <app-filter-select formControlName="unitCode" [options]="units()" valueKey="UnitCode" labelKey="UnitDesc"></app-filter-select>
+                  </td>
+                  <td><input type="number" formControlName="stockQty" readonly /></td>
+                  <td><input type="number" formControlName="requestedQty" /></td>
+                  <td><input type="number" formControlName="issuedQty" /></td>
+                  <td><input formControlName="remarks" /></td>
+                  <td><button type="button" class="remove-btn" (click)="removeItemRow(tae, row.get('slNo')?.value)">✕</button></td>
+                </tr>
+              }
+              @if (tae.length === 0) {
+                <tr><td colspan="8" class="empty">No estimated tools/equipment for this Sales Order</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- ============ APPROVAL ============ -->
+    @if (approvalEnabled()) {
+      <section class="card approval-card" [hidden]="activeTab() !== 'approval'">
+        @if (isNew) {
+          <p class="hint">Save the record first to use the approval workflow.</p>
+        } @else if (!approvalVisible()) {
+          <p class="hint">Approval is not applicable for you on this record.</p>
+        } @else {
+          <div class="approval-status">
+            <span class="status-badge" [class.status-approved]="read(approvalAction(), 'CurrentStatus') === 'A'"
+                  [class.status-denied]="read(approvalAction(), 'CurrentStatus') === 'D'">
+              {{ read(approvalAction(), 'CurrentStatus') === 'A' ? 'Approved' : read(approvalAction(), 'CurrentStatus') === 'D' ? 'Denied' : 'Pending' }}
+            </span>
+            <button type="button" class="secondary" (click)="toggleLock()" [disabled]="approvalBusy()">
+              {{ read(approvalAction(), 'IsLocked') === 'L' ? 'Unlock' : 'Lock' }}
+            </button>
+          </div>
+
+          <div class="grid-2">
+            <div class="field"><label>Created By</label><input [value]="read(approvalAction(), 'CreatedUser')" readonly /></div>
+            <div class="field"><label>Created On</label><input [value]="read(approvalAction(), 'CreatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Modified By</label><input [value]="read(approvalAction(), 'UpdatedUser')" readonly /></div>
+            <div class="field"><label>Last Modified On</label><input [value]="read(approvalAction(), 'UpdatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Approved By</label><input [value]="read(approvalAction(), 'LastApprovedUser')" readonly /></div>
+            <div class="field"><label>Last Approved On</label><input [value]="read(approvalAction(), 'LastApprovedDateTime')" readonly /></div>
+          </div>
+
+          <div class="field full-width">
+            <label>Comment</label>
+            <textarea rows="2" [value]="approvalComment()" (input)="updateApprovalComment($any($event.target).value)"></textarea>
+          </div>
+
+          <div class="approval-actions">
+            <button type="button" class="approve-btn" [disabled]="approvalBusy() || read(approvalAction(), 'ApproveIsEnable') !== 'Y'" (click)="approve()">Approve</button>
+            <button type="button" class="deny-btn" [disabled]="approvalBusy() || read(approvalAction(), 'DenayIsEnable') !== 'Y'" (click)="deny()">Deny</button>
+            <button type="button" class="secondary" (click)="loadApprovalHistory()">View History</button>
+          </div>
+
+          @if (approvalHistory()) {
+            <div class="history-block">
+              <h4>Action History</h4>
+              @for (table of approvalHistory(); track $index) {
+                <div class="table-scroll">
+                  <table>
+                    @if (table.length > 0) {
+                      <thead><tr>@for (key of objectKeys(table[0]); track key) {<th>{{ key }}</th>}</tr></thead>
+                      <tbody>
+                        @for (row of table; track $index) {
+                          <tr>@for (key of objectKeys(table[0]); track key) {<td>{{ row[key] }}</td>}</tr>
+                        }
+                      </tbody>
+                    }
+                  </table>
+                </div>
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+  </form>
+</div>
