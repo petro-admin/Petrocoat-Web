@@ -15,7 +15,7 @@
     "@angular/forms": "^18.2.0",
     "@angular/platform-browser": "^18.2.0",
     "@angular/platform-browser-dynamic": "^18.2.0",
-    "@angular/router": "^18.2.0",
+    "@angular/router": "^20.3.32",
     "chart.js": "^4.5.1",
     "exceljs": "^4.4.0",
     "face-api.js": "^0.22.2",
