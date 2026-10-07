@@ -1,0 +1,500 @@
+:host {
+  display: block;
+  --radius-lg: 14px;
+  --shadow-pop: 0 8px 24px rgba(16, 24, 40, .10);
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 18px clamp(14px, 3vw, 32px) 80px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .docno {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    gap: 10px;
+
+    button {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease, box-shadow .15s ease, transform .05s ease;
+      &:active { transform: translateY(1px); }
+    }
+    .primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(122, 31, 61, .3);
+      &:hover:not(:disabled) { background: var(--accent-dark); }
+    }
+    .primary:disabled { opacity: 0.55; cursor: default; }
+    .secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--border-strong);
+      &:hover { background: var(--surface-sunken); }
+    }
+  }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.loading-overlay {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  margin: 0 auto 12px;
+  padding: 10px 18px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.35);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: mps-spin 0.7s linear infinite;
+}
+
+@keyframes mps-spin { to { transform: rotate(360deg); } }
+
+form.is-loading { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
+
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+// ============ CARDS / FIELDS ============
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 20px;
+
+  h3 { margin: 0 0 14px; font-size: 15px; font-weight: 700; }
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+
+  label { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin-bottom: 6px; letter-spacing: .01em; }
+
+  input, textarea, select {
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    transition: border-color .15s ease, box-shadow .15s ease;
+    min-height: 40px;
+
+    &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+    &::placeholder { color: var(--ink-faint); }
+    &:disabled, &[readonly] { color: var(--ink-muted); background: var(--surface-sunken); }
+  }
+
+  textarea { resize: vertical; min-height: 60px; }
+}
+
+.field.full-width { grid-column: 1 / -1; }
+
+.field-hint { margin-top: 4px; font-size: 11px; color: var(--ink-faint); }
+.required-hint { color: #c0392b; font-weight: 600; }
+
+.grid-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+
+  h3 { margin: 0; }
+
+  .toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .transfer-job { width: 220px; }
+
+  .add-btn, .secondary {
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease;
+    white-space: nowrap;
+  }
+  .add-btn { background: var(--accent); color: #fff; border: none; &:hover { background: var(--accent-dark); } }
+  .secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong); &:hover:not(:disabled) { background: var(--surface-sunken); } &:disabled { opacity: .5; cursor: default; } }
+}
+
+.grid-footer {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  strong { color: var(--ink); }
+}
+
+// ============ TABLES / GRIDS ============
+.table-scroll {
+  overflow: auto;
+  max-height: 60vh;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  scrollbar-width: thin;
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+// Per-column filter row, directly under the header row - Schedule grid and Idle Employees grid.
+.filter-row th {
+  position: sticky;
+  top: 33px;
+  z-index: 2;
+  background: var(--surface);
+  padding: 6px 8px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.filter-row input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 400;
+  min-height: 30px;
+  &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+}
+
+td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+
+tbody tr:hover td { background: var(--surface-muted); }
+
+td input, td select {
+  width: 100%;
+  min-width: 80px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: transparent;
+  color: var(--ink);
+  transition: border-color .15s ease, background .15s ease;
+
+  &:focus { border-color: var(--accent); background: var(--surface); outline: none; box-shadow: 0 0 0 2px var(--accent-light); }
+  &[readonly] { color: var(--ink-muted); background: var(--surface-sunken); }
+}
+
+td.col-wide { min-width: 170px; }
+
+.group-row.job-group td {
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-left: 4px solid var(--accent);
+}
+
+.remove-btn {
+  border: none;
+  background: transparent;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 15px;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  transition: background .15s ease;
+  &:hover { background: #fdecee; }
+}
+
+.empty { text-align: center; color: var(--ink-faint); padding: 20px; }
+
+// ============ APPROVAL ============
+.approval-status { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+
+.status-badge {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: #fff3cd;
+  color: #8a6500;
+  &.status-approved { background: #dcf5e2; color: #1c7a3d; }
+  &.status-denied { background: #fdecee; color: #9f1c2e; }
+}
+
+.approval-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+
+  button {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--ink);
+    transition: background .15s ease;
+    &:disabled { opacity: .5; cursor: default; }
+  }
+
+  .approve-btn { background: #1c7a3d; color: #fff; border-color: transparent; &:hover:not(:disabled) { background: #15602f; } }
+  .deny-btn { background: #c0392b; color: #fff; border-color: transparent; &:hover:not(:disabled) { background: #9f1c2e; } }
+  .secondary:hover { background: var(--surface-sunken); }
+}
+
+.history-block {
+  margin-top: 20px;
+  h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .03em; }
+}
+
+// ============ MODALS (Add Employees / Add Idle Employees) ============
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(28, 32, 39, 0.45);
+  padding: 20px;
+}
+
+.modal-box {
+  width: min(640px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-pop);
+
+  h3 { margin: 0 0 14px; font-size: 16px; font-weight: 700; }
+}
+
+.modal-box-wide { width: min(820px, 100%); }
+
+.modal-table {
+  max-height: 40vh;
+  margin-top: 12px;
+
+  table { min-width: 0; }
+
+  tbody tr { cursor: pointer; }
+  tbody tr.row-disabled { cursor: not-allowed; opacity: 0.5; }
+
+  .filter-row th {
+    background: var(--surface);
+    padding: 6px 8px;
+    position: static;
+  }
+  .filter-row input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: inherit;
+    min-height: 30px;
+    &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+  }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+
+  button {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .primary { background: var(--accent); color: #fff; border-color: transparent; &:hover:not(:disabled) { background: var(--accent-dark); } &:disabled { opacity: .5; cursor: default; } }
+  .secondary { background: var(--surface); color: var(--ink); &:hover { background: var(--surface-sunken); } }
+}
+
+// ============ RESPONSIVE ============
+@media (max-width: 640px) {
+  .page { padding: 12px 12px 90px; }
+  .topbar { padding: 12px; h2 { font-size: 17px; } }
+  .topbar-actions { width: 100%; button { flex: 1; padding: 12px 10px; } }
+  .card { padding: 14px; border-radius: var(--radius-md); }
+  .grid-2 { grid-template-columns: 1fr; gap: 12px; }
+  .grid-toolbar .add-btn { width: 100%; text-align: center; }
+  .approval-actions button { flex: 1 1 calc(50% - 5px); }
+}
+
+// Print-only header box (title + Branch/DocNo/Date) and grouped table - hidden on screen,
+// shown only via @media print, matching the real desktop RDLC report's layout exactly (confirmed
+// against usp_GetManpowerScheduleReport: DENSE_RANK() OVER (ORDER BY JobCode) grouping with
+// Sl No/SONo/Driver/Vehicle/Client merged per job).
+.print-only, .print-table { display: none; }
+
+.print-header-box {
+  .print-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    border: 1px solid #000;
+    padding: 8px;
+    margin-bottom: 0;
+  }
+  .print-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+    td { border: 1px solid #000; padding: 6px 10px; font-size: 12.5px; }
+    td.label { font-weight: 700; width: 90px; }
+  }
+}
+
+// Matches the Print convention already used on Resource Report / Material Expiry Report -
+// window.print() plus CSS that hides the editing chrome. The Schedule grid specifically swaps to
+// the dedicated .print-table above instead of printing the on-screen editable grid directly,
+// since the on-screen grid has one Sl No per employee line while the real report groups/merges by
+// job - a shape the editable grid itself can't represent. Idle Employees has no such grouping, so
+// its own on-screen table still prints directly, just with its editing chrome stripped.
+@media print {
+  :host { background: #fff; }
+  .page { padding: 0; }
+  .no-print, .chk-col, .action-col, .schedule-table-scroll { display: none !important; }
+  .topbar { box-shadow: none; border: none; padding: 0 0 8px; position: static; }
+  .card { box-shadow: none; border: none; padding: 0 0 20px; }
+  .table-scroll { max-height: none; overflow: visible; border: none; }
+  th { position: static; }
+
+  .print-only { display: block; }
+  .print-table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 20px;
+
+    th, td { border: 1px solid #000; padding: 5px 8px; font-size: 11.5px; text-align: left; vertical-align: top; }
+    th { background: #eee; font-weight: 700; }
+  }
+
+  // Form controls read as plain values instead of bordered input boxes once editing isn't
+  // possible anyway - app-filter-select's own internal <input> isn't reachable from here (it's
+  // inside that component's own encapsulated template, fixed there instead - see its own scss).
+  td input, td select, textarea {
+    border: none;
+    background: transparent;
+    padding: 2px 0;
+    color: var(--ink);
+  }
+}

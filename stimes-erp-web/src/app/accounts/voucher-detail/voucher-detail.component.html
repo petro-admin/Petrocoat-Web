@@ -1,0 +1,134 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Journal Entry</div>
+      <h2>{{ isNew ? 'New Journal Entry' : form.get('voucherNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      @if (!isNew) {
+        <button type="button" (click)="print()">Print</button>
+      }
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+    <div class="card">
+      <div class="card-body">
+        <!-- Field order matches the desktop's own Journal.xaml header: Scroll No, then Date / Ref
+             No on the next row. Document Upload has no desktop equivalent (the desktop attaches
+             files per grid line instead) - kept here as a header-level convenience, consistent
+             with every other voucher screen in this web app. -->
+        <div class="field-grid four">
+          <div>
+            <label>Jv No.</label>
+            <input formControlName="voucherNo" readonly />
+          </div>
+          <div>
+            <label>Date</label>
+            <input type="date" formControlName="voucherDate" />
+          </div>
+          <div>
+            <label>Ref No</label>
+            <input formControlName="refNo" placeholder="Reference number" />
+          </div>
+          <div>
+            <label>Document Upload</label>
+            <label class="doc-upload-box" [class.uploading]="uploadingDocument()">
+              <input type="file" accept="image/*,application/pdf" (change)="onDocumentSelected($event)" [disabled]="uploadingDocument()" hidden />
+              <span>{{ uploadingDocument() ? 'Uploading...' : 'Browse, drag document, or take a photo' }}</span>
+            </label>
+          </div>
+        </div>
+
+        @if (documents().length > 0) {
+          <div class="doc-chip-list">
+            @for (doc of documents(); track doc.filePath; let i = $index) {
+              <span class="doc-chip">
+                <a (click)="viewDocument(doc)">📄 {{ doc.fileName }}</a>
+                <button type="button" (click)="removeDocument(i)">✕</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        Account Details
+        <span class="balance-tag" [class.ok]="isBalanced()" [class.bad]="!isBalanced()">
+          Dr {{ totalDebit() }} &nbsp;·&nbsp; Cr {{ totalCredit() }}
+          {{ isBalanced() ? '✓ Balanced' : '✗ Not Balanced' }}
+        </span>
+      </div>
+      <!-- Column order matches the desktop's own gvInnerGrid exactly: Account, Project, Cost
+           Center, InvoiceNo, Narration, Debit, Credit (no TRN column on the desktop side). -->
+      <div class="table-scroll" formArrayName="lines">
+        <table class="journal-table">
+          <colgroup>
+            <col style="width: 40px" />
+            <col style="width: 220px" />
+            <col style="width: 200px" />
+            <col style="width: 200px" />
+            <col style="width: 150px" />
+            <col style="width: 200px" />
+            <col style="width: 130px" />
+            <col style="width: 130px" />
+            <col style="width: 40px" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Sl</th><th>Account</th><th>Project</th><th>Cost Center</th><th>Invoice No</th><th>Narration</th><th>Debit</th><th>Credit</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of lines.controls; track $index; let i = $index) {
+              <tr [formGroupName]="i">
+                <td>{{ line.get('slNo')?.value }}</td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="accountHeadCode" [options]="headOptions()" placeholder="Enter Account"></app-filter-select>
+                </td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="projectSoCode" [options]="salesOrderOptions()" placeholder="Search Project"></app-filter-select>
+                </td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="costCenterCode" [options]="costCenterOptions()" placeholder="Enter cost category"></app-filter-select>
+                </td>
+                <td><input formControlName="referenceNo" placeholder="Enter Invoice No" /></td>
+                <td><input formControlName="narration" placeholder="Enter Narration" /></td>
+                <td><input type="number" formControlName="debitAmount" class="amount-input" placeholder="Enter Debit" /></td>
+                <td><input type="number" formControlName="creditAmount" class="amount-input" placeholder="Enter Credit" /></td>
+                <td><button type="button" class="remove-btn" (click)="removeLine(i)">✕</button></td>
+              </tr>
+            }
+            <tr class="total-row">
+              <td colspan="6">Total</td>
+              <td class="amount-input">{{ currencyShortName() }} {{ formatAmount(totalDebit()) }}</td>
+              <td class="amount-input">{{ currencyShortName() }} {{ formatAmount(totalCredit()) }}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="add-line-btn" (click)="addLine()">+ Add Line</button>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <label>Remarks</label>
+        <textarea formControlName="narration" rows="2" placeholder="Overall narration for this voucher"></textarea>
+      </div>
+    </div>
+  </form>
+  }
+</div>

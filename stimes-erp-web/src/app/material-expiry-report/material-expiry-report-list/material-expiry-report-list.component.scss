@@ -1,0 +1,159 @@
+:host {
+  display: block;
+  --accent: #b45309;
+  --accent-dark: #92400e;
+  --accent-light: #fdf0e0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  padding: 4px 2px 16px;
+
+  .kicker { font-size: 11px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  input, select {
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 12.5px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+    min-width: 140px;
+  }
+
+  button {
+    padding: 9px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { background: var(--surface-sunken); }
+    &.primary { background: var(--accent); color: #fff; border-color: transparent; &:hover { background: var(--accent-dark); } }
+    &:disabled { opacity: .6; cursor: default; }
+  }
+}
+
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.table-scroll {
+  overflow: auto;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 1000px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th.amount { text-align: right; }
+
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+td.amount { text-align: right; font-variant-numeric: tabular-nums; }
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, .06);
+}
+
+// Row tint matches the badge, same Red/Orange/Yellow urgency convention used across the app's
+// other status-colored grids - these backgrounds are deliberately fixed regardless of dark/light
+// theme (same reasoning as DSR's row-absent/row-holiday rows), so text is pinned to a dark color.
+tr.status-expired td { background: #fde1e1; color: #1c2027; }
+tr.status-expired .status-badge { background: #f5b5b5; color: #7a1c1c; }
+
+tr.status-soon td { background: #fde4d1; color: #1c2027; }
+tr.status-soon .status-badge { background: #f3c19f; color: #7a4214; }
+
+tr.status-warning td { background: #fdf2b8; color: #1c2027; }
+tr.status-warning .status-badge { background: #e8d98a; color: #6b5a0a; }
+
+tr.status-ok .status-badge { background: #dcf5e2; color: #1c7a3d; }
+
+.empty { text-align: center; color: var(--ink-faint); padding: 24px; }
+
+@media (max-width: 640px) {
+  .page { padding: 12px 12px 60px; }
+  .filters { flex-direction: column; align-items: stretch; }
+  .filters input, .filters select { min-width: 0; }
+}
+
+.print-only { display: none; }
+
+// Matches Trip Sheet Report's own Print button convention - hide the filter row, let the results
+// table print un-clipped instead of staying trapped in its on-screen scroll box.
+@media print {
+  :host { background: #fff; }
+  .page { background: #fff; padding: 0; }
+  .filters, .hint { display: none !important; }
+  header { padding: 0 0 8px; }
+  .print-only { display: block; color: var(--ink-muted); font-size: 12.5px; margin: 0 0 10px; }
+  .table-scroll { overflow: visible; border: none; box-shadow: none; }
+  th { position: static; }
+}

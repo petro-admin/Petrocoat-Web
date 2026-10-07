@@ -1,0 +1,282 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+}
+
+header {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+
+  h2 { margin: 0 0 12px; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+
+  button {
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background .15s ease;
+    &:hover { background: var(--surface-sunken); }
+    &.active { background: var(--accent); color: #fff; border-color: transparent; }
+  }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  margin-bottom: 16px;
+
+  h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--accent-dark); }
+}
+
+.employee-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  max-width: 400px;
+  margin-bottom: 16px;
+
+  select, input {
+    padding: 9px 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+}
+
+.camera-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.camera-feed {
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #111;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  transform: scaleX(-1); // mirror, like a normal front camera preview
+}
+
+// Face ID-style circular guided-capture preview: a conic-gradient ring (set inline via
+// ringGradient(), since its sweep angle depends on live enrollment progress) wraps a circular,
+// mirrored camera feed. .face-ring-inner's white padding is what gives the ring its visible band.
+.face-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.face-ring {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  padding: 6px;
+  transition: background 0.4s ease;
+}
+
+.face-ring-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  padding: 4px;
+  background: var(--surface, #fff);
+  overflow: hidden;
+}
+
+.camera-feed-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #111;
+  transform: scaleX(-1);
+}
+
+.angle-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.angle-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border, #e2e2e2);
+  transition: background 0.25s ease, transform 0.25s ease;
+
+  &.done { background: #2ecc71; }
+  &.current { background: var(--accent); transform: scale(1.3); }
+}
+
+.angle-instruction {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.enroll-success {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e8e4c;
+  background: #e8f8ee;
+  border: 1px solid #b8e8c8;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin: 0;
+}
+
+.camera-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 200px;
+
+  button {
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .15s ease;
+    &:hover { background: var(--surface-sunken); }
+    &.primary { background: var(--accent); color: #fff; border-color: transparent; &:hover { background: var(--accent-dark); } }
+    &:disabled { opacity: .6; cursor: default; }
+  }
+}
+
+.scan-status { font-size: 13px; color: var(--ink-muted); margin: 0; }
+
+.bulk-log {
+  margin-top: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+
+  p { margin: 0 0 4px; &:last-child { margin-bottom: 0; } }
+}
+
+.last-result {
+  padding: 10px 12px;
+  background: #e5f6ea;
+  color: #1a7a3d;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.table-scroll {
+  overflow: auto;
+  max-height: 50vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+table { border-collapse: collapse; width: 100%; }
+
+th {
+  position: sticky;
+  top: 0;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+.empty { text-align: center; color: var(--ink-faint); padding: 20px; }
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border);
+}
+
+.avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 700;
+}

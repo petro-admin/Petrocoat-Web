@@ -28,4 +28,11 @@ export class UserRightsService {
   getRights(formClassName: string): Observable<UserRights> {
     return this.http.get<UserRights>(this.base, { params: { formClassName } });
   }
+
+  // Top-level module tabs (SystemCode) this user is allowed to see at all - same list the
+  // desktop's MainWindow.CheckMenu() uses to hide/show whole module tabs, separate from the
+  // per-form rights above.
+  getAccessibleSystemModules(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/system-modules`);
+  }
 }

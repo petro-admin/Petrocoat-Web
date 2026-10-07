@@ -1,0 +1,72 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Accident Reporting</h2>
+    <div class="filters">
+      <input type="text" placeholder="Search Report No / Driver / Vehicle" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+        <option value="">All statuses</option>
+        <option value="Submitted">Submitted</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Report</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="summary-row">
+    <div class="summary-card"><div class="label">Open</div><div class="value accent">{{ summary().open }}</div></div>
+    <div class="summary-card"><div class="label">Under Review</div><div class="value warn">{{ summary().review }}</div></div>
+    <div class="summary-card"><div class="label">Injury / Fatal</div><div class="value danger">{{ summary().severe }}</div></div>
+    <div class="summary-card"><div class="label">Closed</div><div class="value good">{{ summary().closed }}</div></div>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Report No</th><th>Date</th><th>Driver</th><th>Vehicle</th><th>Location</th><th>Photos</th><th>Severity</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr class="data-row" (click)="open(row)">
+            <td class="doc-no">{{ read(row, 'DocNo') }}</td>
+            <td>{{ read(row, 'DocDateTime') | date:'dd-MM-yyyy HH:mm' }}</td>
+            <td>{{ read(row, 'DriverName') }}</td>
+            <td>{{ read(row, 'RegistrationNo') }}</td>
+            <td class="location-cell">{{ read(row, 'LocationDescription') || '-' }}</td>
+            <td>{{ read(row, 'PhotoCount') }}</td>
+            <td>
+              <span class="badge" [style.background]="severityStyle(read(row, 'Severity')).bg" [style.color]="severityStyle(read(row, 'Severity')).fg">
+                {{ read(row, 'Severity') }}
+              </span>
+            </td>
+            <td>
+              <span class="badge" [style.background]="statusStyle(read(row, 'Status')).bg" [style.color]="statusStyle(read(row, 'Status')).fg">
+                {{ read(row, 'Status') }}
+              </span>
+            </td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="9" class="empty">No accident reports found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

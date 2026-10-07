@@ -3,6 +3,18 @@
   position: relative;
 }
 
+// A parent page's own @media print rules can't reach this input (view encapsulation scopes them
+// to the parent's own template) - every page that prints a form using app-filter-select (Manpower
+// Schedule, etc.) needs this handled here once, rather than each one reinventing it.
+@media print {
+  input {
+    border: none;
+    background: transparent;
+    padding: 2px 0;
+  }
+  .options { display: none !important; }
+}
+
 .filter-select {
   position: relative;
 
@@ -29,11 +41,10 @@ input {
 }
 
 .options {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  max-width: min(560px, 90vw);
   max-height: 240px;
   overflow-y: auto;
   margin: 0;

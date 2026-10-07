@@ -1,0 +1,50 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Vehicle Handover</h2>
+    <div class="filters">
+      <input type="text" placeholder="Search Doc No / Vehicle / Handed Over By / Received By" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Handover</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Doc No</th><th>Date</th><th>Vehicle</th><th>Odometer (km)</th><th>Handed Over By</th><th>Received By</th><th>Photo</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr class="data-row" (click)="open(row)">
+            <td class="doc-no">{{ read(row, 'DocNo') }}</td>
+            <td>{{ read(row, 'HandoverDate') | date:'dd-MM-yyyy HH:mm' }}</td>
+            <td>{{ read(row, 'RegistrationNo') || '-' }}</td>
+            <td>{{ read(row, 'OdometerKm') ?? '-' }}</td>
+            <td>{{ read(row, 'HandedOverByName') }}</td>
+            <td>{{ read(row, 'ReceivedByName') }}</td>
+            <td>{{ toNumber(read(row, 'HasPhoto')) ? '📷' : '-' }}</td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="8" class="empty">No vehicle handover records found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

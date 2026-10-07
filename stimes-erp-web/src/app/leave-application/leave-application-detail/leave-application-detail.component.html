@@ -1,0 +1,188 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <div class="topbar">
+    <div>
+      <h2>{{ isNew ? 'New Leave Application' : 'Edit Leave Application' }}</h2>
+      <span class="docno" *ngIf="form.get('requestNo')?.value as rn">{{ rn }}</span>
+    </div>
+    <div class="topbar-actions">
+      @if (!isNew) {
+        <button class="secondary" type="button" (click)="print()">Print</button>
+        @if (rights().delete) {
+          <button class="danger" type="button" (click)="deleteRecord()">Delete</button>
+        }
+      }
+      <button class="secondary" type="button" (click)="cancel()">Cancel</button>
+      <button class="primary" type="button" [disabled]="saving() || !canSave()"
+              [title]="!canSave() ? (isApproved() ? 'Approved - cannot be updated' : 'You do not have permission to add') : ''"
+              (click)="save()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" [class.is-loading]="loading()">
+
+    <section class="card">
+      <div class="grid-2">
+        <div class="field">
+          <label>Request No</label>
+          <input formControlName="requestNo" />
+        </div>
+        <div class="field">
+          <label>Date *</label>
+          <app-date-input formControlName="docDate" />
+        </div>
+
+        <div class="field">
+          <label>Leave Type *</label>
+          <select formControlName="requestTypeCode" (change)="onLeaveTypeChanged()">
+            <option [ngValue]="null">-Select-</option>
+            @for (t of leaveTypes(); track read(t, 'LeaveTypeCode')) {
+              <option [ngValue]="toNumber(read(t, 'LeaveTypeCode'))">{{ read(t, 'LeaveTypeDesc') }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label>Available Day(s)</label>
+          <input [value]="availableDays() != null ? availableDays()!.toFixed(2) : '-'" readonly />
+        </div>
+
+        <div class="field">
+          <label>Employee *</label>
+          <input [ngModel]="employeeText()" [ngModelOptions]="{standalone: true}" list="leave-employee-options"
+                 placeholder="Type Employee ID or Name"
+                 (input)="onEmployeeTextChanged($any($event.target).value)" (change)="onEmployeeSelected($any($event.target).value)" />
+          <datalist id="leave-employee-options">
+            @for (e of employees(); track read(e, 'EmployeeCode')) {<option [value]="employeeDisplay(e)"></option>}
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Designation</label>
+          <input [value]="read(selectedEmployee(), 'DesigName') ?? ''" readonly />
+        </div>
+
+        <div class="field">
+          <label>From Date *</label>
+          <app-date-input formControlName="fromDate" />
+        </div>
+        <div class="field">
+          <label>To Date *</label>
+          <app-date-input formControlName="toDate" />
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-label"><input type="checkbox" formControlName="halfDay" /> Half Day Leave</label>
+        </div>
+        <div class="field">
+          <label>Total Days</label>
+          <input [value]="totalDays" readonly />
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-label"><input type="checkbox" formControlName="paidLeaveChecked" /> Paid Leave</label>
+        </div>
+        <div class="field">
+          <label>Paid Leave (Days)</label>
+          <input type="number" formControlName="paidLeave" [readonly]="!form.get('paidLeaveChecked')?.value" />
+        </div>
+
+        <div class="field">
+          <label>Re-Joining Date</label>
+          <app-date-input formControlName="rejoin" />
+        </div>
+        <div class="field file-field">
+          <label>Medical Certificate</label>
+          <div class="file-row">
+            @if (form.get('path')?.value) {
+              <button type="button" class="link-btn" (click)="viewDocument()">
+                View{{ form.get('originalName')?.value ? ' (' + form.get('originalName')?.value + ')' : '' }}
+              </button>
+            }
+            <label class="upload-btn">
+              {{ uploading() ? 'Uploading...' : (form.get('path')?.value ? 'Replace' : 'Upload') }}
+              <input type="file" hidden (change)="onFileSelected($event)" [disabled]="uploading()" />
+            </label>
+          </div>
+        </div>
+
+        <div class="field full-width">
+          <label>Remarks</label>
+          <textarea formControlName="remarks" rows="2"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ APPROVAL ============ -->
+    @if (approvalEnabled()) {
+      <section class="card approval-card">
+        <div class="grid-toolbar">
+          <h3>Approval</h3>
+        </div>
+        @if (isNew) {
+          <p class="hint">Save the record first to use the approval workflow.</p>
+        } @else if (!approvalVisible()) {
+          <p class="hint">Approval is not applicable for you on this record.</p>
+        } @else {
+          <div class="approval-status">
+            <span class="status-badge" [class.status-approved]="read(approvalAction(), 'CurrentStatus') === 'A'"
+                  [class.status-denied]="read(approvalAction(), 'CurrentStatus') === 'D'">
+              {{ read(approvalAction(), 'CurrentStatus') === 'A' ? 'Approved' : read(approvalAction(), 'CurrentStatus') === 'D' ? 'Denied' : 'Pending' }}
+            </span>
+            <button type="button" class="secondary" (click)="toggleLock()" [disabled]="approvalBusy()">
+              {{ read(approvalAction(), 'IsLocked') === 'L' ? 'Unlock' : 'Lock' }}
+            </button>
+          </div>
+
+          <div class="grid-2">
+            <div class="field"><label>Created By</label><input [value]="read(approvalAction(), 'CreatedUser')" readonly /></div>
+            <div class="field"><label>Created On</label><input [value]="read(approvalAction(), 'CreatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Modified By</label><input [value]="read(approvalAction(), 'UpdatedUser')" readonly /></div>
+            <div class="field"><label>Last Modified On</label><input [value]="read(approvalAction(), 'UpdatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Approved By</label><input [value]="read(approvalAction(), 'LastApprovedUser')" readonly /></div>
+            <div class="field"><label>Last Approved On</label><input [value]="read(approvalAction(), 'LastApprovedDateTime')" readonly /></div>
+          </div>
+
+          <div class="field full-width">
+            <label>Comment</label>
+            <textarea rows="2" [value]="approvalComment()" (input)="updateApprovalComment($any($event.target).value)"></textarea>
+          </div>
+
+          <div class="approval-actions">
+            <button type="button" class="approve-btn" [disabled]="approvalBusy() || read(approvalAction(), 'ApproveIsEnable') !== 'Y'" (click)="approve()">Approve</button>
+            <button type="button" class="deny-btn" [disabled]="approvalBusy() || read(approvalAction(), 'DenayIsEnable') !== 'Y'" (click)="deny()">Deny</button>
+            <button type="button" class="secondary" (click)="loadApprovalHistory()">View History</button>
+          </div>
+
+          @if (approvalHistory()) {
+            <div class="history-block">
+              <h4>Action History</h4>
+              @for (table of approvalHistory(); track $index) {
+                <div class="table-scroll">
+                  <table>
+                    @if (table.length > 0) {
+                      <thead><tr>@for (key of objectKeys(table[0]); track key) {<th>{{ key }}</th>}</tr></thead>
+                      <tbody>
+                        @for (row of table; track $index) {
+                          <tr>@for (key of objectKeys(table[0]); track key) {<td>{{ row[key] }}</td>}</tr>
+                        }
+                      </tbody>
+                    }
+                  </table>
+                </div>
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+  </form>
+  }
+</div>

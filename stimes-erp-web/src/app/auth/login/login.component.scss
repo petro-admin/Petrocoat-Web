@@ -151,6 +151,83 @@
   }
 }
 
+.fingerprint-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--pc-surface);
+  border: 1.5px solid var(--pc-navy);
+  color: var(--pc-navy);
+  padding: 13px;
+  border-radius: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease;
+
+  &:hover:not(:disabled) { background: rgba(15, 42, 84, .06); }
+  &:disabled { opacity: .6; cursor: default; }
+}
+.fingerprint-icon { font-size: 18px; line-height: 1; }
+
+.face-login-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1.5px solid var(--pc-border);
+  border-radius: 10px;
+  background: var(--pc-surface);
+}
+
+.face-video {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: #000;
+  object-fit: cover;
+  transform: scaleX(-1); // mirror, so it reads like a mirror rather than a security camera
+}
+
+.face-status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pc-navy);
+  text-align: center;
+}
+
+.face-cancel-btn {
+  border: 1.5px solid var(--pc-border);
+  background: var(--pc-surface);
+  color: var(--pc-ink-muted);
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+  &:hover { background: rgba(15, 42, 84, .06); }
+}
+
+.divider {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--pc-ink-muted);
+  font-size: 12px;
+  margin: 4px 0;
+
+  &::before, &::after { content: ''; flex: 1; height: 1px; background: var(--pc-border); }
+  span { padding: 0 10px; }
+}
+
 .powered-by {
   display: flex;
   align-items: baseline;

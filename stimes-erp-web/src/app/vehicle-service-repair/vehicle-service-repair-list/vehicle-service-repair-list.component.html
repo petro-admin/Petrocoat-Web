@@ -1,0 +1,57 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Vehicle Service / Repair</h2>
+    <div class="filters">
+      <input type="text" placeholder="Search Doc No / Vehicle / Type" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Doc No</th><th>Doc Date</th><th>Vehicle</th><th>Type</th>
+          <th>Current KM</th><th>Next Service KM</th><th>Service/Repair Date</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr (click)="open(row)">
+            <td>{{ read(row, 'DocNo') }}</td>
+            <td>{{ read(row, 'DocDate') | date:'dd-MM-yyyy' }}</td>
+            <td>{{ read(row, 'RegistrationNo') }} <span class="muted" *ngIf="read(row, 'VehicleModel')">({{ read(row, 'VehicleModel') }})</span></td>
+            <td><span class="type-badge">{{ read(row, 'ServiceType') }}</span></td>
+            <td>{{ read(row, 'CurrentKM') }}</td>
+            <td>{{ read(row, 'NextServiceKM') }}</td>
+            <td>{{ read(row, 'ServiceDate') | date:'dd-MM-yyyy' }}</td>
+            <td>
+              <span class="status-badge" [class.completed]="toNumber(read(row, 'StatusCode')) === 2">
+                {{ toNumber(read(row, 'StatusCode')) === 2 ? 'Completed' : 'Open' }}
+              </span>
+            </td>
+            <td class="actions-cell">
+              <button type="button" class="print-btn" (click)="printRow(row, $event)">Print</button>
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="9" class="empty">No records found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

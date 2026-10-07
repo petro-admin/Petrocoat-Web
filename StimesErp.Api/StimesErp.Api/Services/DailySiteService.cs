@@ -11,14 +11,16 @@ namespace StimesErp.Api.Services
     public class DailySiteService
     {
         private readonly SqlHelper _db;
+        private readonly WebAuditService _audit;
 
-        public DailySiteService(SqlHelper db)
+        public DailySiteService(SqlHelper db, WebAuditService audit)
         {
             _db = db;
+            _audit = audit;
         }
 
         // Grid list: WPF calls GetDailySiteHdr(0, Month, Year)
-        public DataTable GetList(int month, int year)
+        public DataTable GetList(int month, int year, int empCode, bool restrictToSupervised)
         {
             int yearCode = year > 99 ? year % 100 : year; // SP expects 2-digit year, e.g. 2026 -> 26
 
@@ -28,7 +30,36 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@MonthCode", SqlDbType.Int, month),
                 SqlHelper.Param("@YearCode", SqlDbType.Int, yearCode)
             };
-            return _db.GetDataTableFromProcedure("usp_GetDailySiteHdr", p);
+            var dt = _db.GetDataTableFromProcedure("usp_GetDailySiteHdr", p);
+            if (!restrictToSupervised) return dt;
+
+            // Regular (UCatCode=6) users only see rows whose own JobCode+DocDate has a
+            // ManpowerScheduleDtl entry naming them as SupervisorCode - checked per row, since a
+            // supervisor's assignment can differ day to day (a job with two different supervisors
+            // scheduled on the same date shows to both, each independently). Only while those jobs
+            // are still Ongoing - Completed jobs drop off the list entirely once finished. ADMIN(1)/
+            // PU(3) are unaffected (restrictToSupervised is only ever true for UCatCode=6).
+            var scheduledPairs = GetScheduledJobDatePairs(empCode, month, year);
+            var rowJobCodes = dt.AsEnumerable().Where(r => r["JobCode"] != DBNull.Value).Select(r => Convert.ToInt32(r["JobCode"]));
+            var latestSoCodeByJobCode = ResolveLatestSoCodes(rowJobCodes);
+            var supervised = dt.Clone();
+            foreach (DataRow row in dt.Rows)
+            {
+                if (row["JobCode"] == DBNull.Value || row["DocDate"] == DBNull.Value) continue;
+                var jobCode = Convert.ToInt32(row["JobCode"]);
+                var docDate = Convert.ToDateTime(row["DocDate"]).Date;
+                var latestSoCode = latestSoCodeByJobCode.GetValueOrDefault(jobCode, jobCode);
+                if (scheduledPairs.Contains((latestSoCode, docDate)))
+                    supervised.ImportRow(row);
+            }
+
+            var ongoing = supervised.Clone();
+            foreach (DataRow row in supervised.Rows)
+            {
+                if (!string.Equals(row["PStatus"] as string, "Completed", StringComparison.OrdinalIgnoreCase))
+                    ongoing.ImportRow(row);
+            }
+            return ongoing;
         }
 
         // Detail header: WPF calls GetDailySiteHdr(DailySiteCode, 0, 0)
@@ -112,9 +143,144 @@ namespace StimesErp.Api.Services
             return _db.GetDataSetFromProcedure("usp_GetDailySiteSOWise", p);
         }
 
-        public DataTable GetSalesOrders()
+        // AdminUserCategoryInfo: 6 = USR (regular user). A regular user only sees Sales Orders/Daily
+        // Site records for jobs where ManpowerSchedule/ManpowerScheduleDtl names them as
+        // SupervisorCode for that exact JobCode+DocDate - replaces the old, date-blind check
+        // against SalesOrderNew's own SupervisorOrForeman field. A job with two different
+        // supervisors scheduled on the same date naturally shows to both, since each one's own
+        // login only ever matches rows where THEY are the SupervisorCode. ADMIN(1) and PU(3) users
+        // see everything, unrestricted. New, web-only filter - applied in C# after the existing
+        // shared stored procedures return their full result, rather than touching
+        // usp_GetDailySiteSalesOrderNo/usp_GetDailySiteHdr themselves (both still used as-is by
+        // the desktop app).
+        //
+        // The NOT EXISTS check is a "once entered, stop offering it" rule: once a Daily Site
+        // already exists for that exact JobCode+DocDate, the schedule slot is fulfilled and drops
+        // out of the dropdown/list again automatically - covers both an ordinary ongoing job and a
+        // Completed one reopened for a scheduled SNAG date.
+        // A Sales Order's SOCode changes every time it's revised (REV01, REV02...) - SOCode stays
+        // grouped under one stable CommonSOCode across all of its revisions, and
+        // usp_GetDailySiteSalesOrderNo only ever shows the latest SOCode per CommonSOCode group. A
+        // ManpowerScheduleDtl.JobCode was stamped with whatever SOCode was current when that
+        // schedule line was created, which goes stale the moment the Sales Order is revised again -
+        // comparing it directly against the (always-latest) candidate list then silently stops
+        // matching. Resolving through CommonSOCode here keeps a supervisor's assignment matching
+        // the Sales Order's current revision even after it's been revised since.
+        private HashSet<int> GetScheduledSoCodes(int empCode, DateTime docDate)
         {
-            return _db.GetDataTableFromProcedure("usp_GetDailySiteSalesOrderNo");
+            var dt = _db.GetDataTableFromQuery(
+                @"select distinct Latest.SOCode
+                  from ManpowerScheduleDtl MD
+                  inner join ManpowerSchedule MS on MS.Code = MD.Code
+                  inner join SalesOrderNew Orig on Orig.SOCode = MD.JobCode
+                  inner join (select max(SOCode) as SOCode, CommonSOCode from SalesOrderNew group by CommonSOCode) Latest
+                      on Latest.CommonSOCode = Orig.CommonSOCode
+                  where MD.SupervisorCode = @EmpCode
+                    and CAST(MS.DocDate as date) = @DocDate
+                    and not exists (
+                        select 1 from DailySiteHdr D
+                        where D.JobCode = Latest.SOCode and CAST(D.DocDate as date) = @DocDate
+                    )",
+                new[]
+                {
+                    SqlHelper.Param("@EmpCode", SqlDbType.Int, empCode),
+                    SqlHelper.Param("@DocDate", SqlDbType.Date, docDate.Date)
+                });
+            return dt.AsEnumerable().Select(r => Convert.ToInt32(r["SOCode"])).ToHashSet();
+        }
+
+        // Same schedule source and same latest-revision resolution as GetScheduledSoCodes, but for
+        // the List grid: every (latest SOCode, DocDate) pair scheduled to this supervisor across the
+        // given month/year in one query, checked per row below instead of per a single date - a List
+        // row keeps its own historical DocDate, so each row's visibility depends on who was
+        // scheduled for ITS date, not today's.
+        private HashSet<(int SoCode, DateTime DocDate)> GetScheduledJobDatePairs(int empCode, int month, int year)
+        {
+            var dt = _db.GetDataTableFromQuery(
+                @"select distinct Latest.SOCode, CAST(MS.DocDate as date) as DocDate
+                  from ManpowerScheduleDtl MD
+                  inner join ManpowerSchedule MS on MS.Code = MD.Code
+                  inner join SalesOrderNew Orig on Orig.SOCode = MD.JobCode
+                  inner join (select max(SOCode) as SOCode, CommonSOCode from SalesOrderNew group by CommonSOCode) Latest
+                      on Latest.CommonSOCode = Orig.CommonSOCode
+                  where MD.SupervisorCode = @EmpCode
+                    and MONTH(MS.DocDate) = @Month and YEAR(MS.DocDate) = @Year",
+                new[]
+                {
+                    SqlHelper.Param("@EmpCode", SqlDbType.Int, empCode),
+                    SqlHelper.Param("@Month", SqlDbType.Int, month),
+                    SqlHelper.Param("@Year", SqlDbType.Int, year)
+                });
+            return dt.AsEnumerable()
+                .Select(r => (Convert.ToInt32(r["SOCode"]), Convert.ToDateTime(r["DocDate"]).Date))
+                .ToHashSet();
+        }
+
+        // Resolves each (possibly stale, pre-revision) SOCode to its Sales Order's current latest
+        // revision - same CommonSOCode grouping GetScheduledSoCodes/GetScheduledJobDatePairs use, so
+        // an existing DailySiteHdr row's own JobCode compares correctly against them even if that
+        // row was created against an older revision than exists today.
+        private Dictionary<int, int> ResolveLatestSoCodes(IEnumerable<int> soCodes)
+        {
+            var distinctCodes = soCodes.Distinct().ToList();
+            var map = new Dictionary<int, int>();
+            if (distinctCodes.Count == 0) return map;
+
+            var dt = _db.GetDataTableFromQuery(
+                @"select Orig.SOCode, Latest.SOCode as LatestSOCode
+                  from SalesOrderNew Orig
+                  inner join (select max(SOCode) as SOCode, CommonSOCode from SalesOrderNew group by CommonSOCode) Latest
+                      on Latest.CommonSOCode = Orig.CommonSOCode
+                  where Orig.SOCode in (" + string.Join(",", distinctCodes) + ")");
+            foreach (DataRow row in dt.Rows)
+                map[Convert.ToInt32(row["SOCode"])] = Convert.ToInt32(row["LatestSOCode"]);
+            return map;
+        }
+
+        // docDate is optional - only known once the user is on the detail form and has a Doc Date
+        // chosen (the initial page-load call from the list has none yet). Without it, scheduled
+        // jobs can't be resolved (supervision is now date-specific), so the dropdown simply stays
+        // empty until a date is available.
+        public DataTable GetSalesOrders(int empCode, bool restrictToSupervised, DateTime? docDate)
+        {
+            var dt = _db.GetDataTableFromProcedure("usp_GetDailySiteSalesOrderNo");
+            if (!restrictToSupervised) return dt;
+            if (!docDate.HasValue) return dt.Clone();
+
+            var scheduledSoCodes = GetScheduledSoCodes(empCode, docDate.Value);
+            var filtered = dt.Clone();
+            foreach (DataRow row in dt.Rows)
+            {
+                if (row["SOCode"] == DBNull.Value) continue;
+                var soCode = Convert.ToInt32(row["SOCode"]);
+                if (scheduledSoCodes.Contains(soCode)) filtered.ImportRow(row);
+            }
+            return filtered;
+        }
+
+        /// <summary>New (no desktop equivalent) - warns before creating a second Daily Site record
+        /// for the same Sales Order on the same date. ExcludeCode lets an in-progress edit of an
+        /// existing record skip matching against itself.</summary>
+        public JobDateExistCheck CheckExistingForJobAndDate(int jobCode, DateTime docDate, int excludeCode)
+        {
+            var p = new[]
+            {
+                SqlHelper.Param("@JobCode", SqlDbType.Int, jobCode),
+                SqlHelper.Param("@DocDate", SqlDbType.DateTime, docDate),
+                SqlHelper.Param("@ExcludeCode", SqlDbType.Int, excludeCode)
+            };
+            var dt = _db.GetDataTableFromQuery(
+                @"SELECT TOP 1 DailySiteCode, DocNo FROM DailySiteHdr
+                  WHERE JobCode = @JobCode AND CAST(DocDate AS DATE) = CAST(@DocDate AS DATE) AND DailySiteCode <> @ExcludeCode",
+                p);
+
+            if (dt.Rows.Count == 0) return new JobDateExistCheck { Exists = false };
+            return new JobDateExistCheck
+            {
+                Exists = true,
+                Code = Convert.ToInt32(dt.Rows[0]["DailySiteCode"]),
+                DocNo = dt.Rows[0]["DocNo"]?.ToString() ?? string.Empty
+            };
         }
 
         public DataTable GetScopePreparations() => _db.GetDataTableFromQuery(
@@ -140,7 +306,7 @@ namespace StimesErp.Api.Services
         /// whether the doc date is a holiday, and whether the employee already has hours logged
         /// elsewhere the same day (usp_GetEmployeeAlReadyExistInDailySite).
         /// </summary>
-        public EmployeeHourContext GetEmployeeHourContext(int employeeCode, DateTime docDate, int dailySiteCode, int loginBranchCode, int periodId)
+        public EmployeeHourContext GetEmployeeHourContext(int employeeCode, DateTime docDate, int dailySiteCode, int loginBranchCode, int periodId, int jobCode = 0)
         {
             var ctx = new EmployeeHourContext();
 
@@ -190,8 +356,46 @@ namespace StimesErp.Api.Services
                 ctx.ExistingDailySiteNo = StringOrDefault(dtExist.Rows[0], "DailySiteNo");
             }
 
+            if (jobCode > 0)
+            {
+                var dtAttendance = _db.GetDataTableFromQuery(
+                    @"select top 1 CheckInTime, CheckOutTime from LabourAttendance
+                      where EmployeeCode = @EmployeeCode and DocDate = @DocDate and JobCode = @JobCode
+                      order by Code desc",
+                    new[]
+                    {
+                        SqlHelper.Param("@EmployeeCode", SqlDbType.Int, employeeCode),
+                        SqlHelper.Param("@DocDate", SqlDbType.Date, docDate.Date),
+                        SqlHelper.Param("@JobCode", SqlDbType.Int, jobCode)
+                    });
+
+                if (dtAttendance.Rows.Count > 0)
+                {
+                    var checkIn = dtAttendance.Rows[0]["CheckInTime"] as DateTime?;
+                    var checkOut = dtAttendance.Rows[0]["CheckOutTime"] as DateTime?;
+                    ctx.AttendanceCheckIn = checkIn;
+                    ctx.AttendanceCheckOut = checkOut;
+                    if (checkIn.HasValue && checkOut.HasValue)
+                        ctx.AttendanceHrs = Math.Round((decimal)(checkOut.Value - checkIn.Value).TotalHours, 2);
+                }
+            }
+
             return ctx;
         }
+
+        // Every employee who has a Check In recorded (Labour Attendance / face recognition) for
+        // this exact Job (Sales Order) and date - lets the Employee Hrs grid auto-add rows for
+        // whoever actually attended, instead of only the SO's default employee template.
+        public DataTable GetAttendanceEmployeesForJob(int jobCode, DateTime docDate) => _db.GetDataTableFromQuery(
+            @"select distinct A.EmployeeCode, E.EmpFullName
+              from LabourAttendance A
+              left join payrollEmployeeInfo E on E.EmployeeCode = A.EmployeeCode
+              where A.JobCode = @JobCode and A.DocDate = @DocDate and A.CheckInTime is not null",
+            new[]
+            {
+                SqlHelper.Param("@JobCode", SqlDbType.Int, jobCode),
+                SqlHelper.Param("@DocDate", SqlDbType.Date, docDate.Date)
+            });
 
         private static decimal DecimalOrDefault(DataRow row, string column)
         {
@@ -239,12 +443,14 @@ namespace StimesErp.Api.Services
         }
 
         /// <summary>
-        /// Lightweight replacement for GetMaterialPreviousContext's TodayMaterialsUsed figure - calls the new,
-        /// much simpler usp_GetDailySiteMaterialPrevTotalUsed (plain sum of TodayConsumed across every other
-        /// DailySiteCode on the same CommonSOCode/material, with the same BaseUnitCode/PackSize divide rule
-        /// applied per historical row) instead of the old, heavier usp_GetDailySiteSOWisePreviousMaterialDtl.
+        /// Lightweight replacement for GetMaterialPreviousContext's TodayMaterialsUsed figure - calls
+        /// usp_GetDailySiteMaterialPrevTotalUsed (plain sum of TodayConsumed across every other DailySiteCode
+        /// on the same CommonSOCode/material, with the same BaseUnitCode/PackSize divide rule applied per
+        /// historical row) instead of the old, heavier usp_GetDailySiteSOWisePreviousMaterialDtl. Also returns
+        /// the cumulative Scope of Work Area Completed for the material's Surface Preparation Code (matched
+        /// via the estimation behind this Sales Order) - the source for the Material table's Area/No/Mtr column.
         /// </summary>
-        public decimal GetMaterialPrevTotalUsed(int soCode, int dailySiteCode, int itemCode)
+        public MaterialPrevTotalUsedResult GetMaterialPrevTotalUsed(int soCode, int dailySiteCode, int itemCode)
         {
             var p = new[]
             {
@@ -253,7 +459,16 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@ItemCode", SqlDbType.Int, itemCode)
             };
             var dt = _db.GetDataTableFromProcedure("usp_GetDailySiteMaterialPrevTotalUsed", p);
-            return dt.Rows.Count > 0 ? DecimalOrDefault(dt.Rows[0], "TotalUsed") : 0;
+            if (dt.Rows.Count == 0) return new MaterialPrevTotalUsedResult();
+
+            var row = dt.Rows[0];
+            return new MaterialPrevTotalUsedResult
+            {
+                TotalUsed = DecimalOrDefault(row, "TotalUsed"),
+                Area = DecimalOrDefault(row, "Area"),
+                RateOfApplication = DecimalOrDefault(row, "RateofApplication"),
+                SurfacePreparationCode = (int)DecimalOrDefault(row, "SurfacePreparationCode")
+            };
         }
 
         /// <summary>
@@ -353,8 +568,33 @@ namespace StimesErp.Api.Services
         /// by the desktop app. Table-valued rows must match the exact columns of the SQL Server
         /// user-defined table types (ERP_UDT_DailySiteScopeOfWork etc.) - see the TODO in DailySiteModels.cs.
         /// </summary>
-        public string Save(DailySiteSaveRequest req, int branchCode, int periodId, int userCode)
+        // AdminUserCategoryInfo: 1 = ADMIN. Normal users (any other UCatCode, including Power
+        // User) can only Update/Delete a Daily Site within 24 hours of its own DocDate - once
+        // that window closes the record is locked from further changes by anyone except an
+        // ADMIN-category user, who is always exempt.
+        private const int ExemptUCatCode = 1;
+
+        private string? CheckEditWindow(int dailySiteCode, int mode, int uCatCode)
         {
+            if (mode == 0 || uCatCode == ExemptUCatCode) return null;
+
+            var hdr = GetById(dailySiteCode);
+            if (hdr.Rows.Count == 0) return null;
+
+            var docDate = hdr.Rows[0]["DocDate"] as DateTime?;
+            if (docDate == null) return null;
+
+            if (DateTime.Now - docDate.Value > TimeSpan.FromHours(24))
+                return "This record is more than 24 hours old and can no longer be updated or deleted.";
+
+            return null;
+        }
+
+        public string Save(DailySiteSaveRequest req, int branchCode, int periodId, int userCode, int uCatCode)
+        {
+            var blockMessage = CheckEditWindow(req.DailySiteCode, req.Mode, uCatCode);
+            if (blockMessage != null) return blockMessage;
+
             try
             {
                 // ============================================================
@@ -367,10 +607,12 @@ namespace StimesErp.Api.Services
                 DataTable dtMaterial =
                     ToMaterialTable(req.Material, req.DailySiteCode);
 
+                var attendanceHrsMap = GetAttendanceHrsMap(req.JobCode, req.DocDate);
                 DataTable dtConsumablesAndMachineries =
                     ToEmployeeHourTable(
                         req.ConsumablesAndMachineries,
-                        req.DailySiteCode);
+                        req.DailySiteCode,
+                        attendanceHrsMap);
 
                 DataTable dtConsumables =
                     ToConsumableTable(
@@ -702,9 +944,19 @@ namespace StimesErp.Api.Services
                 req.ExsistSoCode)
         };
 
-                return _db.DataTransactionsByProcedure(
+                var result = _db.DataTransactionsByProcedure(
                     "usp_ManageDailySite",
                     p);
+
+                var narration = $"{req.DocNo} - Daily Site";
+                switch (req.Mode)
+                {
+                    case 0: _audit.LogAdd("Daily Site", $"{narration} Added", branchCode); break;
+                    case 2: _audit.LogDelete("Daily Site", $"{narration} Deleted", branchCode); break;
+                    default: _audit.LogEdit("Daily Site", $"{narration} Edited", branchCode); break;
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -771,7 +1023,8 @@ namespace StimesErp.Api.Services
                 ("EstimationCode", typeof(int)),       // ADDED
                 ("EstSlNo", typeof(int)),             // ADDED
                 ("SpecialRequirement", typeof(string)),
-                ("Division", typeof(int))
+                ("Division", typeof(int)),
+                ("Remarks", typeof(string))
             );
 
             if (rows == null)
@@ -836,6 +1089,9 @@ namespace StimesErp.Api.Services
                 dr["Division"] =
                     row.Division;
 
+                dr["Remarks"] =
+                    row.Remarks ?? "";
+
                 dt.Rows.Add(dr);
             }
 
@@ -892,7 +1148,43 @@ namespace StimesErp.Api.Services
             return dt;
         }
 
-        private static DataTable ToEmployeeHourTable(List<EmployeeHourRow> rows, int dailySiteCode)
+        /// <summary>AttendanceHrs is deliberately computed fresh here from LabourAttendance at
+        /// save time - keyed by EmployeeCode, one lookup per employee/job/date, latest attendance
+        /// row wins (matches GetEmployeeHourContext's own "top 1 ... order by Code desc"
+        /// convention) - rather than trusting a value the frontend might send, since the frontend
+        /// only ever displays a live preview and never actually submits this field itself.
+        /// WHEN CheckOutTime/CheckInTime IS NULL (an incomplete scan) THEN 8.00, exactly matching
+        /// the formula requested, instead of leaving it blank.</summary>
+        private Dictionary<int, decimal> GetAttendanceHrsMap(int jobCode, DateTime docDate)
+        {
+            var map = new Dictionary<int, decimal>();
+            if (jobCode <= 0) return map;
+
+            var dt = _db.GetDataTableFromQuery(
+                @"SELECT EmployeeCode, CONVERT(decimal(18,2),
+                    CASE
+                        WHEN CheckOutTime IS NULL THEN 8.00
+                        WHEN CheckInTime IS NULL THEN 8.00
+                        ELSE DATEDIFF(SECOND, CheckInTime, CheckOutTime) / 3600.0
+                    END) AS AttendanceHrs
+                  FROM (
+                    SELECT EmployeeCode, CheckInTime, CheckOutTime,
+                           ROW_NUMBER() OVER (PARTITION BY EmployeeCode ORDER BY Code DESC) AS rn
+                    FROM LabourAttendance
+                    WHERE JobCode = @JobCode AND DocDate = @DocDate
+                  ) d WHERE rn = 1",
+                new[]
+                {
+                    SqlHelper.Param("@JobCode", SqlDbType.Int, jobCode),
+                    SqlHelper.Param("@DocDate", SqlDbType.Date, docDate.Date)
+                });
+
+            foreach (DataRow row in dt.Rows)
+                map[Convert.ToInt32(row["EmployeeCode"])] = Convert.ToDecimal(row["AttendanceHrs"]);
+            return map;
+        }
+
+        private static DataTable ToEmployeeHourTable(List<EmployeeHourRow> rows, int dailySiteCode, Dictionary<int, decimal> attendanceHrsMap)
         {
             var dt = NewTable(
                 ("DailySiteCode", typeof(int)),
@@ -906,6 +1198,7 @@ namespace StimesErp.Api.Services
                 ("OT2", typeof(decimal)),
                 ("TotalHrs", typeof(decimal)),
                 ("NormalHrs", typeof(decimal)),
+                ("AttendanceHrs", typeof(decimal)),
                 ("BranchCode", typeof(int)));
 
             foreach (var row in rows)
@@ -922,6 +1215,7 @@ namespace StimesErp.Api.Services
                 dr["OT2"] = row.OT2;
                 dr["TotalHrs"] = row.TotalHrs;
                 dr["NormalHrs"] = row.NormalHrs;
+                dr["AttendanceHrs"] = attendanceHrsMap.TryGetValue(row.EmployeeCode, out var ah) ? (object)ah : DBNull.Value;
                 dr["BranchCode"] = row.BranchCode;
                 dt.Rows.Add(dr);
             }
@@ -938,7 +1232,8 @@ namespace StimesErp.Api.Services
                 ("UsedToday", typeof(decimal)),
                 ("TotalConsumablesUsed", typeof(decimal)),
                 ("BgColor", typeof(string)),
-                ("BaseUnitCode", typeof(int)));
+                ("BaseUnitCode", typeof(int)),
+                ("PackSize", typeof(decimal)));
 
             foreach (var row in rows)
             {
@@ -951,6 +1246,7 @@ namespace StimesErp.Api.Services
                 dr["TotalConsumablesUsed"] = row.TotalConsumablesUsed;
                 dr["BgColor"] = row.BgColor ?? "";
                 dr["BaseUnitCode"] = row.BaseUnitCode ?? 0;
+                dr["PackSize"] = row.PackSize;
                 dt.Rows.Add(dr);
             }
             return dt;

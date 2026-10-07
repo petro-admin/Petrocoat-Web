@@ -1,8 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using StimesErp.Api.Models;
 using StimesErp.Api.Services;
 
@@ -13,12 +9,12 @@ namespace StimesErp.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AuthService _authService;
-        private readonly IConfiguration _config;
+        private readonly JwtTokenService _jwt;
 
-        public AuthController(AuthService authService, IConfiguration config)
+        public AuthController(AuthService authService, JwtTokenService jwt)
         {
             _authService = authService;
-            _config = config;
+            _jwt = jwt;
         }
 
         [HttpPost("login")]
@@ -32,38 +28,16 @@ namespace StimesErp.Api.Controllers
             if (!result.Success)
                 return Unauthorized(new { message = result.ErrorMessage ?? "Invalid Username or Password" });
 
-            var token = GenerateJwt(result.UserCode, result.UserName, result.UCatCode);
+            var token = _jwt.GenerateJwt(result.UserCode, result.UserName, result.UCatCode, result.EmpCode);
 
             return Ok(new LoginResponse
             {
                 Token = token,
                 UserCode = result.UserCode,
                 UserName = result.UserName,
-                UCatCode = result.UCatCode
+                UCatCode = result.UCatCode,
+                EmpCode = result.EmpCode
             });
-        }
-
-        private string GenerateJwt(int userCode, string userName, int uCatCode)
-        {
-            var jwtSection = _config.GetSection("Jwt");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, userCode.ToString()),
-                new Claim(ClaimTypes.Name, userName),
-                new Claim("UCatCode", uCatCode.ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: jwtSection["Issuer"],
-                audience: jwtSection["Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSection["ExpiryMinutes"]!)),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

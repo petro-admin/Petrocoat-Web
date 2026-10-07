@@ -29,5 +29,18 @@ namespace StimesErp.Api.Services
             };
             return _db.GetDataTableFromProcedure("usp_GetUserRightSecurity", p);
         }
+
+        /// <summary>Web equivalent of MainWindow.xaml.cs's CheckMenu() (region "Menu Hiding") -
+        /// the top-level SystemCode (Payroll/Sales/Inventory/Purchase/Accounts/Admin/General/
+        /// Production/Fleet/Estimation/Marketing) rights that decide which whole module tabs a
+        /// user sees at all, separate from and in addition to the per-form Access/Add/Edit/...
+        /// rights above. Desktop grants/denies each SystemCode explicitly via the
+        /// "User_System_Right_Settings" admin screen (AdminUserModuleRightsSettings table) -
+        /// it does not derive this from per-form rights.</summary>
+        public DataTable GetAccessibleSystemCodes(int userCode)
+        {
+            var p = new[] { SqlHelper.Param("@UserCode", SqlDbType.Int, userCode) };
+            return _db.GetDataTableFromProcedure("usp_GetModuleDetailsByUserCode", p);
+        }
     }
 }

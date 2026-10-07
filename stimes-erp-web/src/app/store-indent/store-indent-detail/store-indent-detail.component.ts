@@ -1,12 +1,13 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { StoreIndentService } from '../services/store-indent.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { ApprovalService } from '../../core/services/approval.service';
 import { UserRightsService, UserRights, NO_RIGHTS } from '../../core/services/user-rights.service';
-import { FilterSelectComponent } from '../../shared/filter-select/filter-select.component';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 
 type TabKey = 'basic' | 'general' | 'material' | 'consumable' | 'tae' | 'approval';
@@ -16,7 +17,7 @@ const FORM_CLASS_NAME = 'Stimes.Erp.App.Win.Purchase.StoreIndent';
 @Component({
   selector: 'app-store-indent-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FilterSelectComponent],
+  imports: [CommonModule, ReactiveFormsModule, DateInputComponent],
   templateUrl: './store-indent-detail.component.html',
   styleUrl: './store-indent-detail.component.scss'
 })
@@ -51,6 +52,7 @@ export class StoreIndentDetailComponent implements OnInit {
 
   // Matches desktop's CheckPermission() (myUserRights.ADD/DELETE).
   rights = signal<UserRights>(NO_RIGHTS);
+  rightsLoaded = signal(false);
 
   form!: FormGroup;
 
@@ -91,17 +93,24 @@ export class StoreIndentDetailComponent implements OnInit {
       requisitionDate: ['', Validators.required],
       active: [true],
       costId: [null],
+      costName: [''],
       requisitionType: ['GEN'],
       requisitionSubType: ['OTH'],
       jobCode: [null],
+      jobNo: [''],
       requisitionDetails: [''],
       refNo: [''],
       employeeCode: [null],
+      employeeName: [''],
       designation: [''],
       requestedStatus: [null],
+      requestedStatusName: [''],
       createdByECode: [null],
+      createdByName: [''],
       checkedByECode: [null],
+      checkedByName: [''],
       approvedByECode: [null],
+      approvedByName: [''],
       general: this.fb.array([]),
       material: this.fb.array([]),
       consumable: this.fb.array([]),
@@ -113,36 +122,55 @@ export class StoreIndentDetailComponent implements OnInit {
     this.id = Number(this.route.snapshot.paramMap.get('id') ?? 0);
     this.isNew = this.id === 0;
 
-    this.loadLookups();
     this.loadApprovalSettings();
     this.loadRights();
 
-    if (this.isNew) {
-      this.storeIndentService.generateDocNo(this.settings.periodId()).subscribe(res => {
-        this.form.patchValue({ requisitionNo: res.docNo, requisitionDate: this.today() });
-      });
-      this.refreshProjectGrids(0);
-      this.addGeneralRow();
-    } else {
-      this.loadExisting();
-    }
+    // Lookups (units + Material/Consumable/TAE code->description lists) have to be in hand
+    // before any grid row is created - the SO-estimation SPs only return codes, not names, so
+    // addItemRow resolves the display text from these caches at creation time.
+    this.loadLookups(() => {
+      if (this.isNew) {
+        this.storeIndentService.generateDocNo(this.settings.periodId()).subscribe(res => {
+          this.form.patchValue({ requisitionNo: res.docNo, requisitionDate: this.today() });
+        });
+        this.refreshProjectGrids(0);
+        this.addGeneralRow();
+      } else {
+        this.loadExisting();
+      }
+    });
   }
 
+  // Matches desktop's Init(): txtRequisitionDate.SelectedDate = Convert.ToDateTime(ProcessingDate) -
+  // the new record's Requisition Date defaults from Processing Date, not the browser's system date.
   private today(): string {
-    return new Date().toISOString().substring(0, 10);
+    const processingDate = this.settings.processingDate() ?? new Date();
+    return processingDate.toISOString().substring(0, 10);
   }
 
-  private loadLookups(): void {
-    this.storeIndentService.getLookups(this.settings.branchCode()).subscribe({
-      next: lookups => {
+  private loadLookups(callback?: () => void): void {
+    forkJoin({
+      lookups: this.storeIndentService.getLookups(this.settings.branchCode()),
+      material: this.storeIndentService.getItemLookup(1),
+      consumable: this.storeIndentService.getItemLookup(2),
+      tae: this.storeIndentService.getItemLookup(3)
+    }).subscribe({
+      next: ({ lookups, material, consumable, tae }) => {
         this.costCenters.set(lookups.costCenters ?? []);
         this.units.set(lookups.units ?? []);
         this.salesOrders.set(lookups.salesOrders ?? []);
         this.users.set(lookups.users ?? []);
         this.employees.set(lookups.employees ?? []);
         this.requestedStatuses.set(lookups.requestedStatuses ?? []);
+        // Pre-warms the same cache loadGeneralItemOptions() reads from, so both the General
+        // grid's item picker and Material/Consumable/TAE's SO-estimation name resolution
+        // (addItemRow) share one fetch instead of duplicating it.
+        this.generalItemLookupCache.set(1, material ?? []);
+        this.generalItemLookupCache.set(2, consumable ?? []);
+        this.generalItemLookupCache.set(3, tae ?? []);
+        callback?.();
       },
-      error: () => this.errorMessage.set('Could not load Store Indent dropdown data.')
+      error: () => { this.errorMessage.set('Could not load Indent dropdown data.'); callback?.(); }
     });
   }
 
@@ -169,8 +197,8 @@ export class StoreIndentDetailComponent implements OnInit {
 
   private loadRights(): void {
     this.userRightsService.getRights(FORM_CLASS_NAME).subscribe({
-      next: rights => this.rights.set(rights),
-      error: () => this.rights.set(NO_RIGHTS)
+      next: rights => { this.rights.set(rights); this.rightsLoaded.set(true); },
+      error: () => { this.rights.set(NO_RIGHTS); this.rightsLoaded.set(true); }
     });
   }
 
@@ -193,28 +221,43 @@ export class StoreIndentDetailComponent implements OnInit {
         const requisitionSubType = this.read(hdr, 'RequestedSubType') === 'INH' ? 'INH' : 'OTH';
         const jobCode = this.toNumber(this.read(hdr, 'JobCode'));
 
+        const costId = this.toNumber(this.read(hdr, 'CostId')) || null;
+        const employeeCode = this.toNumber(this.read(hdr, 'EmployeeCode')) || null;
+        const requestedStatus = this.toNumber(this.read(hdr, 'RequestedStatus')) || null;
+        const createdByECode = this.toNumber(this.read(hdr, 'CreatedByECode')) || null;
+        const checkedByECode = this.toNumber(this.read(hdr, 'CheckedByECode')) || null;
+        const approvedByECode = this.toNumber(this.read(hdr, 'ApprovedByECode')) || null;
+        const so = jobCode ? this.findSalesOrderByCode(jobCode) : null;
+
         this.form.patchValue({
           requisitionNo: this.read(hdr, 'PurReqnNo'),
           requisitionDate: this.toDateInputValue(this.read(hdr, 'PReqnDate')),
           active: this.read(hdr, 'ActiveYesNo') !== 'N',
-          costId: this.read(hdr, 'CostId'),
+          costId,
+          costName: this.resolveName(this.costCenters(), costId, 'CostId', 'CostName'),
           requisitionType,
           requisitionSubType,
           jobCode: jobCode || null,
+          jobNo: so ? this.read(so, 'SONo') : '',
           requisitionDetails: this.read(hdr, 'PurReqnDetails', 'ReqnDetails'),
           refNo: this.read(hdr, 'PReqnRefNo'),
-          employeeCode: this.read(hdr, 'EmployeeCode'),
+          employeeCode,
+          employeeName: this.resolveName(this.employees(), employeeCode, 'EmployeeCode', 'EmpFullName'),
           designation: this.read(hdr, 'Designation'),
-          requestedStatus: this.read(hdr, 'RequestedStatus'),
-          createdByECode: this.read(hdr, 'CreatedByECode'),
-          checkedByECode: this.read(hdr, 'CheckedByECode'),
-          approvedByECode: this.read(hdr, 'ApprovedByECode')
+          requestedStatus,
+          requestedStatusName: this.resolveName(this.requestedStatuses(), requestedStatus, 'StatusCode', 'StatusName'),
+          createdByECode,
+          createdByName: this.resolveName(this.users(), createdByECode, 'UserCode', 'UserName'),
+          checkedByECode,
+          checkedByName: this.resolveName(this.users(), checkedByECode, 'UserCode', 'UserName'),
+          approvedByECode,
+          approvedByName: this.resolveName(this.users(), approvedByECode, 'UserCode', 'UserName')
         });
 
         this.responseArray(res, 'General', 'general').forEach((r: any) => this.addGeneralRow(r));
-        this.responseArray(res, 'Material', 'material').forEach((r: any) => this.addItemRow(this.material, r));
-        this.responseArray(res, 'Consumable', 'consumable').forEach((r: any) => this.addItemRow(this.consumable, r));
-        this.responseArray(res, 'TAE', 'tae').forEach((r: any) => this.addItemRow(this.tae, r));
+        this.responseArray(res, 'Material', 'material').forEach((r: any) => this.addItemRow(this.material, 1, r));
+        this.responseArray(res, 'Consumable', 'consumable').forEach((r: any) => this.addItemRow(this.consumable, 2, r));
+        this.responseArray(res, 'TAE', 'tae').forEach((r: any) => this.addItemRow(this.tae, 3, r));
         if (this.general.length === 0) this.addGeneralRow();
 
         if (this.approvalEnabled()) this.loadApprovalStatus();
@@ -224,14 +267,33 @@ export class StoreIndentDetailComponent implements OnInit {
     });
   }
 
-  // Sales Order No / Employee are both app-filter-select bound directly to their code
-  // FormControls now, so the matching option's label is resolved and shown automatically - no
-  // separate display-name lookup needed for either.
+  // ---------- Generic header lookup fields (Cost Center, Employee, Requested Status,
+  // Created/Checked/Approved By) - native <input list>/<datalist> pair matching Daily Site's
+  // onLookupTextChanged pattern exactly, instead of the app-filter-select widget.
+  onLookupTextChanged(nameControl: string, codeControl: string, value: string, items: any[], codeKey: string, nameKey: string): void {
+    const normalizedValue = value.trim().toLowerCase();
+    const item = items.find(entry => String(this.read(entry, nameKey) ?? '').trim().toLowerCase() === normalizedValue);
+    const code = item ? Number(this.read(item, codeKey)) : null;
+    this.form.patchValue({
+      [nameControl]: item ? this.read(item, nameKey) : value,
+      [codeControl]: code
+    }, { emitEvent: false });
+
+    if (item && codeControl === 'employeeCode') this.onEmployeeChanged(code);
+  }
+
+  private resolveName(items: any[], code: number | null, codeKey: string, nameKey: string): string {
+    if (!code) return '';
+    const match = items.find(entry => this.toNumber(this.read(entry, codeKey)) === code);
+    return match ? this.toText(this.read(match, nameKey)) : '';
+  }
 
   // ---------- Type radio (General / Project) ----------
+  // Matches desktop's rdbType_Click: only toggles which tabs are visible (Material/Consumable/TAE
+  // vs General) - it does not change the currently selected tab, so this stays on whichever tab
+  // you're already on (typically Basic Details, where these radios live).
   onRequisitionTypeChanged(value: string): void {
     this.form.patchValue({ requisitionType: value, requisitionSubType: 'OTH' });
-    this.activeTab.set(value === 'PRO' ? 'material' : 'general');
     if (value === 'PRO') {
       const jobCode = this.toNumber(this.form.get('jobCode')?.value);
       this.refreshProjectGrids(jobCode);
@@ -242,22 +304,39 @@ export class StoreIndentDetailComponent implements OnInit {
     this.form.patchValue({ requisitionSubType: value });
   }
 
-  // ---------- Sales Order (Project mode auto-fill; inert in General mode, matching desktop's
-  // txtJobDet_SelectionChanged, which only acts when rdbGeneral.IsChecked == false).
-  // formControlName="jobCode" has already synced the FormControl by the time this runs -
-  // Angular always resolves a directive's own value-accessor listener before a template (change)
-  // listener bound to the same element/event. ----------
-  onSalesOrderChanged(): void {
-    if (!this.isProjectMode()) return;
+  // ---------- Sales Order - native <input list>/<datalist>. A native datalist's (change) event
+  // is not reliable when a suggestion is picked with the mouse (see filter-select.component.ts's
+  // own comment on exactly this) - a plain (input) always fires on every value change though, so
+  // the full cascade (jobNo normalization + Project-mode auto-fill, matching desktop's
+  // txtJobDet_SelectionChanged) runs from there as soon as a full match exists, not just from
+  // (change). (change) still calls the same logic too, as a harmless redundant safety net.
+  onSalesOrderTextChanged(value: string): void {
+    this.applySalesOrderMatch(value);
+  }
 
-    const jobCode = this.toNumber(this.form.get('jobCode')?.value);
-    if (!jobCode) return;
+  onSalesOrderSelected(value: string): void {
+    this.applySalesOrderMatch(value);
+  }
 
-    const so = this.findSalesOrderByCode(jobCode);
-    if (!so) return;
+  private applySalesOrderMatch(value: string): void {
+    const order = this.findSalesOrderByName(value);
+    const jobCode = order ? Number(this.read(order, 'SOCode')) : null;
+    const previousJobCode = this.toNumber(this.form.get('jobCode')?.value) || null;
 
-    this.form.patchValue({ requisitionDetails: this.read(so, 'ProjectOrLocation') }, { emitEvent: false });
-    this.refreshProjectGrids(jobCode);
+    this.form.patchValue({
+      jobCode,
+      jobNo: order ? this.read(order, 'SONo') : this.form.get('jobNo')?.value
+    }, { emitEvent: false });
+
+    if (order && jobCode && this.isProjectMode() && jobCode !== previousJobCode) {
+      this.form.patchValue({ requisitionDetails: this.read(order, 'ProjectOrLocation') }, { emitEvent: false });
+      this.refreshProjectGrids(jobCode);
+    }
+  }
+
+  private findSalesOrderByName(value: string): any {
+    const normalized = value.trim().toLowerCase();
+    return this.salesOrders().find(item => String(this.read(item, 'SONo')).trim().toLowerCase() === normalized);
   }
 
   private findSalesOrderByCode(code: unknown): any {
@@ -265,16 +344,23 @@ export class StoreIndentDetailComponent implements OnInit {
   }
 
   private refreshProjectGrids(soCode: number): void {
+    // Matches Daily Site's loadSalesOrderDetails: the same loading-overlay + disabled-tabs
+    // treatment while the Sales Order's Material/Consumable/TAE estimation is being fetched.
+    this.loading.set(true);
     this.storeIndentService.getSalesOrderEstimation(soCode, this.settings.periodId()).subscribe({
       next: res => {
         this.material.clear();
         this.consumable.clear();
         this.tae.clear();
-        (res.Material ?? []).forEach((r: any) => this.addItemRow(this.material, r));
-        (res.Consumable ?? []).forEach((r: any) => this.addItemRow(this.consumable, r));
-        (res.TAE ?? []).forEach((r: any) => this.addItemRow(this.tae, r));
+        // res.Material/Consumable/TAE was reading PascalCase, but ASP.NET Core serializes JSON as
+        // camelCase by default - this always came back undefined, silently leaving all three grids
+        // empty. responseArray tries both casings, same fix loadExisting() already relies on.
+        this.responseArray(res, 'Material', 'material').forEach((r: any) => this.addItemRow(this.material, 1, r));
+        this.responseArray(res, 'Consumable', 'consumable').forEach((r: any) => this.addItemRow(this.consumable, 2, r));
+        this.responseArray(res, 'TAE', 'tae').forEach((r: any) => this.addItemRow(this.tae, 3, r));
+        this.loading.set(false);
       },
-      error: () => this.errorMessage.set('Could not load sales order estimation details.')
+      error: () => { this.errorMessage.set('Could not load sales order estimation details.'); this.loading.set(false); }
     });
   }
 
@@ -288,6 +374,7 @@ export class StoreIndentDetailComponent implements OnInit {
 
   // ---------- General grid ----------
   addGeneralRow(data?: any): void {
+    const unitCode = this.toNumber(this.read(data, 'UnitCode')) || null;
     this.general.push(this.fb.group({
       slNo: [this.read(data, 'SlNo') ?? this.nextSlNo(this.general)],
       typeCode: [this.read(data, 'TypeCode') ?? null],
@@ -295,8 +382,8 @@ export class StoreIndentDetailComponent implements OnInit {
       itemCode: [this.read(data, 'ItemCode') ?? null],
       itemName: [this.read(data, 'Description') ?? ''],
       descriptionNew: [this.read(data, 'DescriptionNew') ?? ''],
-      unitCode: [this.read(data, 'UnitCode') ?? null],
-      unitName: [this.read(data, 'UnitDesc') ?? ''],
+      unitCode: [unitCode],
+      unitName: [this.toText(this.read(data, 'UnitDesc')) || this.resolveUnitName(unitCode)],
       stockQty: [{ value: this.read(data, 'StockQty') ?? 0, disabled: true }],
       requestedQty: [this.read(data, 'RequestedQty') ?? 0],
       issuedQty: [this.read(data, 'IssuedQty') ?? 0],
@@ -304,7 +391,14 @@ export class StoreIndentDetailComponent implements OnInit {
     }));
   }
 
-  removeGeneralRow(slNo: unknown): void { this.removeRowBySlNo(this.general, slNo); }
+  // Matches desktop's gvGeneral_Deleting: "Are you sure delete this item" (Yes/No) before removing.
+  async removeGeneralRow(slNo: unknown): Promise<void> {
+    if (!(await this.confirmDialog.confirm('Are you sure delete this item ?'))) return;
+    this.removeRowBySlNo(this.general, slNo);
+    // Matches desktop's gvGeneral_Deleted: if the row that's now last is already filled in
+    // (leftover from before the delete), keep one open blank row ready same as normal entry.
+    this.maybeAppendBlankGeneralRow();
+  }
 
   onGeneralStatusChanged(index: number): void {
     const row = this.general.at(index);
@@ -319,14 +413,31 @@ export class StoreIndentDetailComponent implements OnInit {
     const typeCode = this.toNumber(row.get('typeCode')?.value);
     row.patchValue({ itemCode: null, itemName: '', unitCode: null, unitName: '', stockQty: 0 }, { emitEvent: false });
     this.loadGeneralItemOptions(typeCode);
+    this.maybeAppendBlankGeneralRow();
+  }
+
+  onGeneralRequestedQtyChanged(): void {
+    this.maybeAppendBlankGeneralRow();
+  }
+
+  // Matches desktop's gvGeneral_RowEditEnded: once the last row has a Type and a
+  // RequestedQty > 0, a fresh blank row is appended automatically so there's always one open
+  // row ready for the next entry, the same way desktop's grid behaves.
+  private maybeAppendBlankGeneralRow(): void {
+    const rows = this.general.controls;
+    if (rows.length === 0) return;
+    const last = rows[rows.length - 1];
+    const typeCode = this.toNumber(last.get('typeCode')?.value);
+    const requestedQty = this.toNumber(last.get('requestedQty')?.value);
+    if (typeCode && requestedQty > 0) this.addGeneralRow();
   }
 
   loadGeneralItemOptions(typeCode: number): void {
     const cached = this.generalItemLookupCache.get(typeCode);
     if (cached) { this.generalItemOptions.set(cached); return; }
-    if (!typeCode || typeCode === 4) { this.generalItemOptions.set([]); return; }
+    if (!typeCode) { this.generalItemOptions.set([]); return; }
 
-    this.storeIndentService.getItemLookup(typeCode).subscribe({
+    this.storeIndentService.getItemLookup(typeCode, this.settings.branchCode()).subscribe({
       next: items => {
         this.generalItemLookupCache.set(typeCode, items ?? []);
         this.generalItemOptions.set(items ?? []);
@@ -365,8 +476,10 @@ export class StoreIndentDetailComponent implements OnInit {
     this.storeIndentService.getItemSpec(itemCode, typeCode, this.settings.periodId()).subscribe({
       next: spec => {
         if (!spec) return;
+        const unitCode = this.toNumber(this.read(spec, 'UnitCode')) || null;
         row.patchValue({
-          unitCode: this.read(spec, 'UnitCode'),
+          unitCode,
+          unitName: this.resolveUnitName(unitCode),
           stockQty: this.toNumber(this.read(spec, 'StockQty'))
         }, { emitEvent: false });
       }
@@ -374,21 +487,101 @@ export class StoreIndentDetailComponent implements OnInit {
   }
 
   // ---------- Material / Consumable / Tools & Equipment (Project mode) ----------
-  addItemRow(rows: FormArray, data?: any): void {
+  // usp_GetSalesOrderMaterialDetailsForStoreIndent/GetEstimationConsumableDetailsForStoreIndent/
+  // GetEstimationTAEDetailsForStoreIndent only return ItemCode/UnitCode, never a description - same
+  // as desktop, which resolves the display text through the grid's own item/unit master lookups
+  // rather than the SP result. typeCode (1=Material/2=Consumable/3=TAE) picks which cached
+  // ItemCode->Description list (see loadLookups/loadGeneralItemOptions) to resolve itemName from.
+  addItemRow(rows: FormArray, typeCode: number, data?: any): void {
+    const itemCode = this.toNumber(this.read(data, 'ItemCode', 'ConsumableCode', 'ToolsAndEquipmentCode')) || null;
+    const unitCode = this.toNumber(this.read(data, 'UnitCode')) || null;
+    const lookupItems = this.generalItemLookupCache.get(typeCode) ?? [];
+    const matchedItem = itemCode ? lookupItems.find(i => this.toNumber(this.read(i, 'ItemCode')) === itemCode) : null;
+    const itemName = this.toText(this.read(data, 'Specification', 'Description'))
+      || (matchedItem ? this.toText(this.read(matchedItem, 'Description')) : '');
+    const unitName = this.toText(this.read(data, 'UnitDesc')) || this.resolveUnitName(unitCode);
+    // A row is Direct (manually added) if it's brand new in this session, or - once reloaded -
+    // if the server persisted it as Direct via usp_Purchase_SetStoreIndentDirectFlags. Rows
+    // pulled from the Sales Order estimation stay locked forever; a Direct row stays editable
+    // even after reload, since it was never derived from the estimation to begin with.
+    const isDirect = data ? this.read(data, 'IsDirect') === 'Y' : true;
+
     rows.push(this.fb.group({
       slNo: [this.read(data, 'SlNo') ?? this.nextSlNo(rows)],
-      itemCode: [this.read(data, 'ItemCode', 'ConsumableCode', 'ToolsAndEquipmentCode') ?? null],
-      itemName: [this.read(data, 'Specification', 'Description') ?? ''],
-      unitCode: [this.read(data, 'UnitCode') ?? null],
-      unitName: [this.read(data, 'UnitDesc') ?? ''],
+      itemCode: [itemCode],
+      itemName: [{ value: itemName, disabled: !!data && !isDirect }],
+      unitCode: [unitCode],
+      unitName: [unitName],
       stockQty: [{ value: this.read(data, 'StockQty') ?? 0, disabled: true }],
       requestedQty: [this.read(data, 'RequestedQty') ?? 0],
       issuedQty: [this.read(data, 'IssuedQty') ?? 0],
-      remarks: [this.read(data, 'Remarks') ?? '']
+      remarks: [this.read(data, 'Remarks') ?? ''],
+      isDirect: [isDirect]
     }));
   }
 
   removeItemRow(rows: FormArray, slNo: unknown): void { this.removeRowBySlNo(rows, slNo); }
+
+  // Matches Daily Site's Material/Consumable/Machineries color legend exactly, so "Direct" vs
+  // "Estimation Wise" reads the same way across both forms.
+  itemRowColor(row: AbstractControl): string {
+    return row.get('isDirect')?.value ? '#DDEBF7' : '#FCE4D6';
+  }
+
+  // The cached ItemCode->Description lists (see loadLookups) exposed per tab for the "+ Add Row"
+  // item picker's datalist - typeCode 1/2/3 match Material/Consumable/TAE respectively.
+  materialItemOptions(): any[] { return this.generalItemLookupCache.get(1) ?? []; }
+  consumableItemOptions(): any[] { return this.generalItemLookupCache.get(2) ?? []; }
+  taeItemOptions(): any[] { return this.generalItemLookupCache.get(3) ?? []; }
+
+  // Item picker for a manually-added Material/Consumable/TAE row (estimation rows have this
+  // locked - see addItemRow). Mirrors onGeneralItemChanged's duplicate check and UnitCode/StockQty
+  // spec lookup, scoped to this row's own fixed typeCode instead of a per-row Type dropdown.
+  onItemRowNameChanged(rows: FormArray, index: number, typeCode: number, value: string): void {
+    const row = rows.at(index);
+    const options = this.generalItemLookupCache.get(typeCode) ?? [];
+    const item = options.find(entry => String(this.read(entry, 'Description')).trim().toLowerCase() === value.trim().toLowerCase());
+
+    if (!item) {
+      row.patchValue({ itemName: value, itemCode: null }, { emitEvent: false });
+      return;
+    }
+
+    const itemCode = this.toNumber(this.read(item, 'ItemCode'));
+    const duplicate = rows.controls.some((other, otherIndex) =>
+      otherIndex !== index && this.toNumber(other.get('itemCode')?.value) === itemCode);
+
+    if (duplicate) {
+      this.errorMessage.set('Item Already Entered');
+      row.patchValue({ itemCode: null, itemName: '', unitCode: null, stockQty: 0 }, { emitEvent: false });
+      return;
+    }
+
+    row.patchValue({ itemCode, itemName: this.read(item, 'Description') }, { emitEvent: false });
+
+    this.storeIndentService.getItemSpec(itemCode, typeCode, this.settings.periodId()).subscribe({
+      next: spec => {
+        if (!spec) return;
+        const unitCode = this.toNumber(this.read(spec, 'UnitCode')) || null;
+        row.patchValue({
+          unitCode,
+          unitName: this.resolveUnitName(unitCode),
+          stockQty: this.toNumber(this.read(spec, 'StockQty'))
+        }, { emitEvent: false });
+      }
+    });
+  }
+
+  // Shared by the General/Material/Consumable/TAE grids' Uom column - native <input list>/<datalist>
+  // matching Daily Site's row-level lookup pattern instead of app-filter-select.
+  onUnitChanged(row: AbstractControl, value: string): void {
+    const normalized = value.trim().toLowerCase();
+    const unit = this.units().find(u => String(this.read(u, 'UnitDesc')).trim().toLowerCase() === normalized);
+    row.patchValue({
+      unitName: unit ? this.read(unit, 'UnitDesc') : value,
+      unitCode: unit ? Number(this.read(unit, 'UnitCode')) : null
+    }, { emitEvent: false });
+  }
 
   // ---------- Approval workflow ----------
   async toggleLock(): Promise<void> {
@@ -535,7 +728,8 @@ export class StoreIndentDetailComponent implements OnInit {
       stockQty: this.toNumber(row.stockQty),
       requestedQty: this.toNumber(row.requestedQty),
       issuedQty: this.toNumber(row.issuedQty),
-      remarks: this.toText(row.remarks)
+      remarks: this.toText(row.remarks),
+      isDirect: !!row.isDirect
     }));
   }
 
@@ -617,5 +811,11 @@ export class StoreIndentDetailComponent implements OnInit {
   private toText(value: unknown): string {
     if (value === null || value === undefined) return '';
     return String(value);
+  }
+
+  private resolveUnitName(unitCode: number | null): string {
+    if (!unitCode) return '';
+    const match = this.units().find(u => this.toNumber(this.read(u, 'UnitCode')) === unitCode);
+    return match ? this.toText(this.read(match, 'UnitDesc')) : '';
   }
 }

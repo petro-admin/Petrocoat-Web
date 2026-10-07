@@ -11,10 +11,12 @@ namespace StimesErp.Api.Services
     public class SettingsService
     {
         private readonly SqlHelper _db;
+        private readonly WebAuditService _audit;
 
-        public SettingsService(SqlHelper db)
+        public SettingsService(SqlHelper db, WebAuditService audit)
         {
             _db = db;
+            _audit = audit;
         }
 
         // CompanyMasterDetails.GetCompanyTable(0, "", "")
@@ -70,7 +72,9 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@tnPeriodId", SqlDbType.Int, periodId),
                 SqlHelper.Param("@tcExpire", SqlDbType.VarChar, "", 100)
             };
-            return _db.DataTransactionsByProcedure("usp_ManageSettings", p);
+            var result = _db.DataTransactionsByProcedure("usp_ManageSettings", p);
+            _audit.LogEdit("Settings", "Quick Settings updated (Company/Branch/Period)", branchCode);
+            return result;
         }
 
         // Year.CheckFinanicalPeriod(PeriodId, Fdate) - same gate SaveSettings() runs before persisting

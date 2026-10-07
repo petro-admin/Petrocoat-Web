@@ -1,0 +1,185 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  color: #1a1a1a;
+  background: #eee;
+}
+
+.print-page {
+  max-width: 29.7cm;
+  margin: 0 auto;
+  padding: 1cm;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+
+  .toolbar-hint {
+    font-size: 11.5px;
+    color: #667085;
+    margin-right: auto;
+  }
+
+  button {
+    padding: 8px 20px;
+    border: 0;
+    border-radius: 6px;
+    background: #1f5a7a;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &.secondary {
+      background: #fff;
+      color: #1f5a7a;
+      border: 1px solid #1f5a7a;
+    }
+  }
+}
+
+.hint, .error { text-align: center; padding: 24px; }
+.error { color: #9f1c2e; }
+
+// One report per selected DSR, each starting on its own printed page. break-before on the new
+// section (not break-after on the previous one) - more reliably forces a fresh page across
+// browsers' print engines than break-after does, especially once a report's own content already
+// runs close to a full page.
+.report-section {
+  display: block;
+}
+.report-section.page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+// A table split mid-row across a page boundary is illegible - keep each row (and short tables
+// like the signature block) intact on one page rather than torn across two.
+.grid-table tr, .info-table, .signature-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 0 0 12px;
+  background: #cfe3ec;
+  padding: 6px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 16px 0 4px;
+}
+
+table { border-collapse: collapse; width: 100%; }
+
+.info-table {
+  font-size: 11.5px;
+  margin-bottom: 8px;
+
+  td {
+    border: 1px solid #888;
+    padding: 4px 8px;
+  }
+  .label {
+    background: #cfe3ec;
+    font-weight: 600;
+    white-space: nowrap;
+    width: 1%;
+  }
+}
+
+.table-scroll { overflow-x: auto; }
+
+.grid-table {
+  font-size: 11px;
+
+  th, td {
+    border: 1px solid #888;
+    padding: 4px 6px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  th {
+    background: #cfe3ec;
+    font-weight: 600;
+  }
+  td.text-left { text-align: left; }
+  .empty { color: #888; font-style: italic; }
+
+  tfoot .totals-row td {
+    background: #eef5f8;
+    font-weight: 700;
+  }
+
+  // Same category grouping as the main detail grid, instead of a plain "Category" column.
+  .category-row td {
+    background: #17435c;
+    color: #fff;
+    font-weight: 700;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-size: 10.5px;
+  }
+
+  // Matches the desktop's own row background colors (2=Absent red, 4=Holiday yellow, 7=Idle
+  // blue, 8=Vacation orange) - same mapping as the main detail grid's rowClass().
+  tr.row-absent td { background: #fde1e1; color: #1c2027; }
+  tr.row-holiday td { background: #fdf2b8; color: #1c2027; }
+  tr.row-idle td { background: #dceefb; color: #1c2027; }
+  tr.row-vacation td { background: #fde4d1; color: #1c2027; }
+}
+
+.signature-block {
+  display: flex;
+  gap: 40px;
+  margin-top: 32px;
+}
+.signature-cell {
+  flex: 1;
+  font-size: 11px;
+
+  .signature-role {
+    background: #cfe3ec;
+    font-weight: 700;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid #888;
+  }
+  .signature-line {
+    border: 1px solid #888;
+    border-top: none;
+    padding: 18px 6px 4px;
+  }
+}
+
+// Chrome/Edge omit background colors when printing unless a page explicitly opts back in -
+// without this, the category header and status row colors above would print as plain white.
+* {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media print {
+  :host { background: #fff; }
+  .print-page { max-width: none; padding: 0; margin: 0; }
+  .no-print { display: none !important; }
+  .table-scroll { overflow-x: visible; }
+
+  @page {
+    size: A4 landscape;
+    margin: 1cm;
+  }
+}

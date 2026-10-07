@@ -1,6 +1,11 @@
 <div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
   <header>
-    <h2>Store Indent</h2>
+    <h2>Indent</h2>
     <div class="filters">
       <select [(ngModel)]="selectedMonth" (change)="refresh()">
         <option [value]="0">All Months</option>
@@ -46,7 +51,7 @@
                  (ngModelChange)="updateFilter('docNo', $event)" />
         </th>
         <th class="date-column">
-          <input type="date"
+          <app-date-input
                  [ngModel]="filters().docDate"
                  (ngModelChange)="updateFilter('docDate', $event)" />
         </th>
@@ -92,7 +97,7 @@
 
                 @if (!isCollapsed(customer.key)) {
                   @for (row of customer.rows; track rowValue(row, 'Code')) {
-                    <tr class="data-row" [style.background-color]="rowValue(row, 'BgColour') || rowValue(row, 'BgColor') || null" (click)="open(row)">
+                    <tr class="data-row" [class.tinted]="rowValue(row, 'BgColour') || rowValue(row, 'BgColor')" [style.background-color]="rowValue(row, 'BgColour') || rowValue(row, 'BgColor') || null" (click)="open(row)">
                       <td>{{ rowValue(row, 'PurReqnNo') }}</td>
                       <td class="date-column">{{ rowValue(row, 'PReqnDate') | date:'dd-MM-yyyy' }}</td>
                       <td>{{ rowValue(row, 'ReqnDetails') }}</td>
@@ -113,4 +118,5 @@
     </tbody>
   </table>
   </div>
+  }
 </div>

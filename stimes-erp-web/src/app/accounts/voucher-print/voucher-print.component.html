@@ -1,0 +1,66 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <span class="toolbar-hint">"Download PDF" opens the print dialog — choose "Save as PDF" as the destination</span>
+    <button type="button" (click)="print()">Download PDF</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    <h1 class="report-title">{{ rowValue(header(), 'VoucherType') }} VOUCHER</h1>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">Voucher No :</td><td>{{ rowValue(header(), 'VoucherNo') }}</td>
+        <td class="label">Voucher Date :</td><td>{{ rowValue(header(), 'VoucherDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Narration :</td><td colspan="3">{{ rowValue(header(), 'Narration') }}</td>
+      </tr>
+    </table>
+
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Sl</th><th>Account Head</th><th>Cost Center</th><th>Narration</th><th>Debit</th><th>Credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of lines(); track $index) {
+            <tr>
+              <td>{{ rowValue(line, 'SlNo') }}</td>
+              <td class="text-left">{{ rowValue(line, 'HeadName') }}</td>
+              <td class="text-left">{{ rowValue(line, 'CostCenterName') }}</td>
+              <td class="text-left">{{ rowValue(line, 'Narration') }}</td>
+              <td class="amount">{{ toNumber(rowValue(line, 'DebitAmount')) ? toNumber(rowValue(line, 'DebitAmount')) : '' }}</td>
+              <td class="amount">{{ toNumber(rowValue(line, 'CreditAmount')) ? toNumber(rowValue(line, 'CreditAmount')) : '' }}</td>
+            </tr>
+          }
+          @if (lines().length === 0) {
+            <tr><td colspan="6" class="empty">No lines recorded</td></tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="4" class="text-right">Total</td>
+            <td class="amount">{{ totalDebit() }}</td>
+            <td class="amount">{{ totalCredit() }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">Prepared By</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">Approved By</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+    </div>
+  }
+</div>

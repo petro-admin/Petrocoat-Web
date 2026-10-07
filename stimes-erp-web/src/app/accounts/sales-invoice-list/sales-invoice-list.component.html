@@ -1,0 +1,48 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Activity</div>
+      <h2>Sales Invoice</h2>
+    </div>
+    <div class="filters">
+      <input type="text" placeholder="Search Invoice No / Customer" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Sales Invoice</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Total</th><th>Outstanding</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr class="data-row" (click)="open(row)">
+            <td>{{ read(row, 'InvoiceNo') }}</td>
+            <td>{{ read(row, 'InvoiceDate') | date:'dd-MM-yyyy' }}</td>
+            <td>{{ read(row, 'CustomerName') }}</td>
+            <td class="amount">{{ read(row, 'TotalAmount') }}</td>
+            <td class="amount">{{ outstanding(row) }}</td>
+            <td><span class="status-badge" [class.paid]="status(row) === 'Paid'" [class.partial]="status(row) === 'Partially Paid'">{{ status(row) }}</span></td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="7" class="empty">No Sales Invoices found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

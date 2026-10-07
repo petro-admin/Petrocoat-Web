@@ -1,0 +1,58 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <span class="toolbar-hint">"Download PDF" opens the print dialog — choose "Save as PDF" as the destination</span>
+    <button type="button" (click)="print()">Download PDF</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    <h1 class="report-title">LEAVE APPLICATION</h1>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">Request No :</td><td>{{ rowValue(data(), 'RequestNo') }}</td>
+        <td class="label">Date :</td><td>{{ rowValue(data(), 'DocDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Employee ID :</td><td>{{ rowValue(data(), 'EmpID') }}</td>
+        <td class="label">Employee Name :</td><td>{{ rowValue(data(), 'EmpFullName') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Designation :</td><td>{{ rowValue(data(), 'DesigName') }}</td>
+        <td class="label">Department :</td><td>{{ rowValue(data(), 'DeptName') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Leave Type :</td><td>{{ rowValue(data(), 'LeaveTypeDesc') }}</td>
+        <td class="label">Total Days :</td><td>{{ rowValue(data(), 'TotalLeaveDays') }}</td>
+      </tr>
+      <tr>
+        <td class="label">From Date :</td><td>{{ rowValue(data(), 'FromDate') | date:'dd-MM-yyyy' }}</td>
+        <td class="label">To Date :</td><td>{{ rowValue(data(), 'ToDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Half Day :</td><td>{{ rowValue(data(), 'HalfDay') === 'Y' ? 'Yes' : 'No' }}</td>
+        <td class="label">Paid Leave :</td><td>{{ rowValue(data(), 'chkPaidLeave') === 'Y' ? (rowValue(data(), 'PaidLeave') + ' Day(s)') : 'No' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Re-Joining Date :</td><td>{{ rowValue(data(), 'Rejoin') | date:'dd-MM-yyyy' }}</td>
+        <td class="label">Status :</td><td>{{ approvalStatusText() }}</td>
+      </tr>
+      <tr>
+        <td class="label">Remarks :</td><td colspan="3">{{ rowValue(data(), 'Remarks') }}</td>
+      </tr>
+    </table>
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">Employee Signature</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">Approved By</div>
+        <div class="signature-line">{{ approvedByName() }}</div>
+      </div>
+    </div>
+  }
+</div>

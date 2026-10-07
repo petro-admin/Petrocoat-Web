@@ -1,0 +1,44 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Master</div>
+      <h2>Cost Center Master</h2>
+    </div>
+    <div class="filters">
+      <input type="text" placeholder="Search Cost Center" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Cost Center</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Cost Center</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr class="data-row" (click)="open(row)">
+            <td>{{ read(row, 'CostCenterName') }}</td>
+            <td><span class="status-badge" [class.inactive]="!read(row, 'IsActive')">{{ read(row, 'IsActive') ? 'Active' : 'Inactive' }}</span></td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="3" class="empty">No Cost Centers found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

@@ -12,6 +12,13 @@ obj/
 # Contains the real production JWT signing key - keep out of the (currently public) repo
 **/appsettings.Production.json
 
+# Contains a live DB password (sa account) - stopped tracking this on 2026-10-07; it remains in
+# older commit history, which a full history rewrite would be needed to remove
+**/appsettings.json
+
+# Runtime-uploaded files (VSR documents, etc.) - user data, not source
+StimesErp.Api/StimesErp.Api/Uploads/
+
 # Node
 node_modules/
 **/node_modules/

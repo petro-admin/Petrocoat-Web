@@ -1,0 +1,120 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Fleet · Vehicle Handover</div>
+      <h2>{{ isNew ? 'New Vehicle Handover' : form.get('docNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+
+    <div class="card">
+      <div class="card-title">Handover Details</div>
+      <div class="card-body">
+        <div class="field-grid">
+          <div>
+            <label>Handover Date &amp; Time</label>
+            <input type="datetime-local" formControlName="handoverDate" />
+          </div>
+          <div>
+            <label>Odometer (km)</label>
+            <input type="number" formControlName="odometerKm" placeholder="Current KM reading" />
+          </div>
+        </div>
+
+        <label>Vehicle</label>
+        <select formControlName="vehicleCode">
+          <option [ngValue]="null">-Select-</option>
+          @for (v of vehicles(); track read(v, 'VehicleCode')) {
+            <option [ngValue]="toNumber(read(v, 'VehicleCode'))">{{ read(v, 'RegistrationNo') }}</option>
+          }
+        </select>
+
+        <label>Reason for Handover</label>
+        <textarea formControlName="reason" rows="3" placeholder="e.g. Driver change, vehicle transfer to another site..."></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Handed Over By</div>
+      <div class="card-body">
+        <label>Select employee</label>
+        <select (change)="onEmployeeSelected('handedOverBy', $any($event.target).value)">
+          <option value="">Choose to autofill, or type a name below...</option>
+          @for (emp of employees(); track read(emp, 'EmployeeCode')) {
+            <option [value]="read(emp, 'EmployeeCode')">{{ read(emp, 'EmpFullName') }}</option>
+          }
+        </select>
+
+        <label>Name</label>
+        <input formControlName="handedOverByName" placeholder="Full name" />
+        <div class="field-grid">
+          <div>
+            <label>Designation</label>
+            <input formControlName="handedOverByDesignation" placeholder="Optional" />
+          </div>
+          <div>
+            <label>Contact Number</label>
+            <input formControlName="handedOverByContact" placeholder="Optional" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Received By</div>
+      <div class="card-body">
+        <label>Select employee</label>
+        <select (change)="onEmployeeSelected('receivedBy', $any($event.target).value)">
+          <option value="">Choose to autofill, or type a name below...</option>
+          @for (emp of employees(); track read(emp, 'EmployeeCode')) {
+            <option [value]="read(emp, 'EmployeeCode')">{{ read(emp, 'EmpFullName') }}</option>
+          }
+        </select>
+
+        <label>Name</label>
+        <input formControlName="receivedByName" placeholder="Full name" />
+        <div class="field-grid">
+          <div>
+            <label>Designation</label>
+            <input formControlName="receivedByDesignation" placeholder="Optional" />
+          </div>
+          <div>
+            <label>Contact Number</label>
+            <input formControlName="receivedByContact" placeholder="Optional" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Vehicle Photograph</div>
+      <div class="card-body">
+        @if (photoUrl()) {
+          <div class="photo-preview">
+            <img [src]="photoUrl()" alt="Vehicle photograph" />
+            <button type="button" class="photo-remove" (click)="removePhoto()">✕</button>
+          </div>
+        } @else {
+          <label class="photo-add" [class.uploading]="uploadingPhoto()">
+            <input type="file" accept="image/*" capture="environment" (change)="onPhotoSelected($event)" [disabled]="uploadingPhoto()" hidden />
+            <span>{{ uploadingPhoto() ? 'Uploading...' : '+ Add vehicle photograph' }}</span>
+          </label>
+        }
+      </div>
+    </div>
+  </form>
+  }
+</div>

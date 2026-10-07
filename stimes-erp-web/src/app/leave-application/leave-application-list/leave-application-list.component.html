@@ -1,0 +1,90 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Leave Application</h2>
+    <div class="filters">
+      <select [ngModel]="year()" (ngModelChange)="year.set($any($event)); refresh()">
+        @for (y of years(); track y) {
+          <option [ngValue]="y">{{ y === 0 ? 'All Years' : y }}</option>
+        }
+      </select>
+      <input type="text" placeholder="Search Request No / Employee / Leave Type" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Request No</th><th>Employee</th><th>Designation</th><th>Leave Type</th>
+          <th>From Date</th><th>To Date</th><th>Total Days</th><th>Remarks</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (branch of branchGroups(); track branch.key) {
+          <tr class="group-row branch-group" (click)="toggle(branch.key)">
+            <td colspan="9">
+              <span class="chevron" [class.collapsed]="isCollapsed(branch.key)">▾</span>
+              {{ branch.label }}
+            </td>
+          </tr>
+
+          @if (!isCollapsed(branch.key)) {
+            @for (year of branch.yearGroups; track year.key) {
+              <tr class="group-row year-group" (click)="toggle(year.key)">
+                <td colspan="9">
+                  <span class="chevron" [class.collapsed]="isCollapsed(year.key)">▾</span>
+                  {{ year.label }}
+                </td>
+              </tr>
+
+              @if (!isCollapsed(year.key)) {
+                @for (month of year.monthGroups; track month.key) {
+                  <tr class="group-row month-group" (click)="toggle(month.key)">
+                    <td colspan="9">
+                      <span class="chevron" [class.collapsed]="isCollapsed(month.key)">▾</span>
+                      {{ month.label }}
+                    </td>
+                  </tr>
+
+                  @if (!isCollapsed(month.key)) {
+                    @for (row of month.rows; track read(row, 'RequestID')) {
+                      <tr class="data-row" (click)="open(row)">
+                        <td>{{ read(row, 'RequestNo') }}</td>
+                        <td>{{ read(row, 'EmpFullName') }}</td>
+                        <td>{{ read(row, 'DesigName') }}</td>
+                        <td><span class="type-badge">{{ read(row, 'LeaveTypeDesc') }}</span></td>
+                        <td>{{ read(row, 'FromDate') | date:'dd-MM-yyyy' }}</td>
+                        <td>{{ read(row, 'ToDate') | date:'dd-MM-yyyy' }}</td>
+                        <td>{{ read(row, 'TotalLeaveDays') }}</td>
+                        <td class="muted">{{ read(row, 'Remarks') }}</td>
+                        <td class="actions-cell">
+                          @if (rights().delete) {
+                            <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        @if (branchGroups().length === 0 && !loading()) {
+          <tr><td colspan="9" class="empty">No records found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

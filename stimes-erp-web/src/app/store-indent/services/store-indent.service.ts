@@ -25,8 +25,8 @@ export class StoreIndentService {
     return this.http.get<any>(`${this.base}/lookups`, { params: { branchCode } });
   }
 
-  getItemLookup(typeCode: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.base}/item-lookup`, { params: { typeCode } });
+  getItemLookup(typeCode: number, branchCode: number = 0): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/item-lookup`, { params: { typeCode, branchCode } });
   }
 
   getItemSpec(itemCode: number, typeCode: number, periodId: number): Observable<any> {

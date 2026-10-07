@@ -1,0 +1,231 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Fleet · Accident Reporting</div>
+      <h2>{{ isNew ? 'Report an Accident' : form.get('docNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Submit' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+
+    <div class="card">
+      <div class="card-title">Accident Location</div>
+      <div class="card-body">
+        @if (locating()) {
+          <p class="hint">Capturing your current location...</p>
+        }
+        @if (locationError()) {
+          <p class="error">{{ locationError() }}</p>
+        }
+        @if (mapLink(); as link) {
+          <div class="location-summary">
+            <a [href]="link" target="_blank" rel="noopener">Open in Google Maps →</a>
+            <span class="coords">{{ form.get('latitude')?.value }}, {{ form.get('longitude')?.value }}</span>
+          </div>
+        }
+        <button type="button" class="ghost-btn" [disabled]="locating() || fieldsLocked" (click)="captureLocation()">Re-capture location</button>
+
+        <label>Location description</label>
+        <input formControlName="locationDescription" [readonly]="fieldsLocked" placeholder="e.g. Al Quoz Industrial Area, near Gate 4" />
+
+        @if (lastKnownGps() && isNew) {
+          <div class="last-known">
+            <span>
+              Vehicle's last known location:
+              @if (lastKnownMapLink(); as gpsLink) {
+                <a [href]="gpsLink" target="_blank" rel="noopener">{{ read(lastKnownGps(), 'Address') || 'Open in Google Maps' }}</a>
+              } @else {
+                {{ read(lastKnownGps(), 'Address') || '-' }}
+              }
+              ({{ read(lastKnownGps(), 'EventTime') | date:'dd-MM HH:mm' }})
+            </span>
+            <button type="button" class="ghost-btn" (click)="useLastKnownLocation()">Use this instead</button>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Accident Details</div>
+      <div class="card-body">
+        <div class="field-grid">
+          <div>
+            <label>Date &amp; Time</label>
+            <input type="datetime-local" formControlName="docDateTime" [readonly]="fieldsLocked" />
+          </div>
+          <div>
+            <label>Odometer (km) @if (fetchingGps()) { <span class="label-hint">fetching from GPS...</span> }</label>
+            <input type="number" formControlName="odometerKm" [readonly]="fieldsLocked" />
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div>
+            <label>Driver</label>
+            <select formControlName="driverEmployeeCode" [disabled]="fieldsLocked">
+              <option [ngValue]="null">-Select-</option>
+              @for (d of drivers(); track read(d, 'EmployeeCode')) {
+                <option [ngValue]="toNumber(read(d, 'EmployeeCode'))">{{ read(d, 'EmpFullName') }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label>Vehicle</label>
+            <select formControlName="vehicleCode" [disabled]="fieldsLocked">
+              <option [ngValue]="null">-Select-</option>
+              @for (v of vehicles(); track read(v, 'VehicleCode')) {
+                <option [ngValue]="toNumber(read(v, 'VehicleCode'))">{{ read(v, 'RegistrationNo') }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <label>Severity</label>
+        <div class="sev-picker">
+          @for (s of severities; track s.value) {
+            <div class="sev-chip" [class.on]="form.get('severity')?.value === s.value"
+                 [style.background]="form.get('severity')?.value === s.value ? s.bg : '#fff'"
+                 [style.borderColor]="form.get('severity')?.value === s.value ? s.color : '#e4e7ec'"
+                 (click)="!fieldsLocked && form.patchValue({ severity: s.value })">
+              <span class="dot" [style.background]="s.color"></span>
+              <span [style.color]="form.get('severity')?.value === s.value ? s.color : '#667085'">{{ s.value }}</span>
+            </div>
+          }
+        </div>
+
+        <label>What happened</label>
+        <textarea formControlName="accidentDescription" rows="4" [readonly]="fieldsLocked" placeholder="Describe how the accident happened..."></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="toggle-block">
+          <label>Other vehicle involved?</label>
+          <div class="toggle-row">
+            <button type="button" class="toggle-btn" [class.on]="form.get('otherVehicleInvolved')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ otherVehicleInvolved: true })">Yes</button>
+            <button type="button" class="toggle-btn" [class.on]="!form.get('otherVehicleInvolved')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ otherVehicleInvolved: false })">No</button>
+          </div>
+          @if (form.get('otherVehicleInvolved')?.value) {
+            <input formControlName="otherVehiclePlateNo" [readonly]="fieldsLocked" placeholder="Other vehicle plate no." />
+            <input formControlName="otherDriverName" [readonly]="fieldsLocked" placeholder="Other driver name" />
+            <input formControlName="otherDriverContact" [readonly]="fieldsLocked" placeholder="Other driver contact number" />
+          }
+        </div>
+
+        <div class="toggle-block">
+          <label>Police called?</label>
+          <div class="toggle-row">
+            <button type="button" class="toggle-btn" [class.on]="form.get('policeCalled')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ policeCalled: true })">Yes</button>
+            <button type="button" class="toggle-btn" [class.on]="!form.get('policeCalled')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ policeCalled: false })">No</button>
+          </div>
+          @if (form.get('policeCalled')?.value) {
+            <input formControlName="policeReportNo" [readonly]="fieldsLocked" placeholder="Police report number" />
+          }
+        </div>
+
+        <div class="toggle-block">
+          <label>Any injuries?</label>
+          <div class="toggle-row">
+            <button type="button" class="toggle-btn" [class.on]="form.get('injuriesReported')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ injuriesReported: true })">Yes</button>
+            <button type="button" class="toggle-btn" [class.on]="!form.get('injuriesReported')?.value" [disabled]="fieldsLocked" (click)="form.patchValue({ injuriesReported: false })">No</button>
+          </div>
+          @if (form.get('injuriesReported')?.value) {
+            <textarea formControlName="injuryDetails" rows="2" [readonly]="fieldsLocked" placeholder="Who was injured, and how badly"></textarea>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Accident Photos</div>
+      <div class="card-body">
+        <div class="photo-grid">
+          @for (photo of photos(); track photo.filePath; let i = $index) {
+            <div class="photo-thumb">
+              @if (photo.url) {
+                <img [src]="photo.url" alt="Accident photo" />
+              }
+              @if (!fieldsLocked) {
+                <button type="button" class="photo-remove" (click)="removePhoto(i)">✕</button>
+              }
+            </div>
+          }
+          @if (!fieldsLocked) {
+            <label class="photo-add" [class.uploading]="uploadingPhoto()">
+              <input type="file" accept="image/*" capture="environment" multiple (change)="onPhotoSelected($event)" [disabled]="uploadingPhoto()" hidden />
+              <span>{{ uploadingPhoto() ? 'Uploading...' : '+ Add photo' }}</span>
+            </label>
+          }
+        </div>
+        <p class="hint small">Photos are taken directly from the device camera at the time of upload.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Documents</div>
+      <div class="card-body">
+        <p class="hint small">Attach the police report, insurance papers, or anything else relevant - each with its own description.</p>
+
+        @if (documents().length > 0) {
+          <table class="doc-table">
+            <thead><tr><th>Sl</th><th>Description</th><th>File</th><th></th></tr></thead>
+            <tbody>
+              @for (doc of documents(); track doc.filePath; let i = $index) {
+                <tr>
+                  <td>{{ doc.slNo }}</td>
+                  <td>{{ doc.description || '-' }}</td>
+                  <td class="doc-file">📄 {{ doc.name }}</td>
+                  <td>
+                    @if (!fieldsLocked) {
+                      <button type="button" class="ghost-btn" (click)="removeDocument(i)">Remove</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (!fieldsLocked) {
+          <div class="doc-add-row">
+            <input type="text" [ngModel]="pendingDocDescription()" (ngModelChange)="pendingDocDescription.set($event)" [ngModelOptions]="{ standalone: true }" placeholder="Description (e.g. Police report, Insurance copy)" />
+            <label class="doc-upload-btn" [class.uploading]="uploadingDocument()">
+              <input type="file" accept="image/*,application/pdf" capture="environment" (change)="onDocumentSelected($event)" [disabled]="uploadingDocument()" hidden />
+              <span>{{ uploadingDocument() ? 'Uploading...' : '+ Add document' }}</span>
+            </label>
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (!isNew && rights().edit) {
+      <div class="card review-card">
+        <div class="card-title">Review</div>
+        <div class="card-body">
+          <label>Status</label>
+          <select formControlName="status">
+            <option value="Submitted">Submitted</option>
+            <option value="Under Review">Under Review</option>
+            <option value="Closed">Closed</option>
+          </select>
+          <label>Supervisor Remarks</label>
+          <textarea formControlName="supervisorRemarks" rows="4" placeholder="Add a note for this report..."></textarea>
+        </div>
+      </div>
+    }
+  </form>
+  }
+</div>

@@ -1,21 +1,7 @@
 :host {
   display: block;
-  --accent: #7a1f3d;
-  --accent-dark: #5e1730;
-  --accent-light: #fbeef1;
   --accent-soft: #f3dfe6;
-  --ink: #1c2027;
-  --ink-muted: #667085;
-  --ink-faint: #98a2b3;
-  --border: #e4e7ec;
-  --border-strong: #d0d5dd;
-  --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --surface-sunken: #f4f5f7;
-  --radius-sm: 6px;
-  --radius-md: 10px;
   --radius-lg: 14px;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
   --shadow-pop: 0 8px 24px rgba(16, 24, 40, .10);
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
@@ -93,6 +79,16 @@
 }
 
 .hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 
 .loading-overlay {
   position: sticky;
@@ -276,8 +272,12 @@ form.is-loading {
 }
 
 // ============ TABLES / GRIDS ============
+// Bounded, independently-scrolling box per table (not the whole page) so the sticky header
+// below actually has something to stick within, instead of fighting the page's own sticky
+// topbar/tabs bar for the same top:0 position.
 .table-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 60vh;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -292,6 +292,9 @@ table {
 }
 
 .wide-table { min-width: 1250px; }
+// Plain text, not an input - Attendance Hrs is a reference-only figure from Labour Attendance,
+// deliberately not part of the editable grid surface at all (see applyEmployeeHourContext).
+.attendance-hrs-cell { color: var(--ink-muted); text-align: center; }
 
 // Matches the desktop app's "Material/Consumable/Machineries Type" legend boxes above each grid
 .color-legend {
@@ -324,6 +327,7 @@ table {
 th {
   position: sticky;
   top: 0;
+  z-index: 2;
   background: var(--accent-light);
   color: var(--accent-dark);
   font-size: 11px;
@@ -366,9 +370,30 @@ tbody tr:hover td { background: var(--surface-muted); }
 .remarks-cell {
   min-width: 240px;
   min-height: 32px;
+  max-height: 140px;
+  // Grows with typed content instead of scrolling internally - falls back to plain
+  // manual resize (via the resize:vertical below) on browsers that don't support it yet.
+  field-sizing: content;
+  overflow-y: auto;
   resize: vertical;
   font-family: inherit;
   line-height: 1.4;
+}
+
+// Scope of Work is mainly filled in on a tablet in the field, so its numeric/short
+// columns (Unit, Area, rates, etc.) are pinned to just wide enough for their content via
+// colgroup + table-layout:fixed, instead of each stretching out under the generic
+// 70px-per-input rule - that space goes to Description/Remarks instead, and the table
+// fits the screen without needing to scroll sideways to see the rest of the columns.
+.scope-table {
+  table-layout: fixed;
+  min-width: 0;
+
+  th { white-space: normal; text-align: center; }
+
+  td input, td select, td textarea { min-width: 0; padding: 6px 4px; font-size: 12.5px; }
+
+  .remarks-cell { min-width: 0; }
 }
 
 .scope-group-row td {
@@ -460,6 +485,56 @@ td input.key-input, td select.key-input {
 
 .empty { text-align: center; color: var(--ink-faint); padding: 20px; }
 
+// ============ APPROVAL ============
+.approval-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.status-badge {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: #fff3cd;
+  color: #8a6500;
+
+  &.status-approved { background: #dcf5e2; color: #1c7a3d; }
+  &.status-denied { background: #fdecee; color: #9f1c2e; }
+}
+
+.approval-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+
+  button {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--ink);
+    transition: background .15s ease;
+    &:disabled { opacity: .5; cursor: default; }
+  }
+
+  .approve-btn { background: #1c7a3d; color: #fff; border-color: transparent; &:hover:not(:disabled) { background: #15602f; } }
+  .deny-btn { background: #c0392b; color: #fff; border-color: transparent; &:hover:not(:disabled) { background: #9f1c2e; } }
+  .secondary:hover { background: var(--surface-sunken); }
+}
+
+.history-block {
+  margin-top: 20px;
+  h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .03em; }
+}
+
 // ============ RESPONSIVE ============
 @media (max-width: 1024px) {
   .summary-layout { grid-template-columns: 1fr; }
@@ -484,4 +559,24 @@ td input.key-input, td select.key-input {
   .tab-btn { padding: 10px 14px; font-size: 12.5px; }
 
   .grid-toolbar .add-btn { width: 100%; text-align: center; }
+
+  .approval-actions button { flex: 1 1 calc(50% - 5px); }
+}
+
+// table-layout:fixed's min-width:0 on .scope-table (above) is meant to let the table fit a normal
+// tablet in landscape without horizontal scrolling - but below this breakpoint there isn't enough
+// room for that, and with NO floor at all, the two percentage-width columns (Description 20%,
+// Remarks 22%) get squeezed toward zero while the fixed-px columns hold their size, to the point
+// Description's text wraps one letter per line instead of just getting clipped.
+//
+// This isn't only a narrow-phone problem: Windows/macOS display scaling (e.g. 175%) shrinks the
+// browser's effective CSS viewport by the same ratio as a physically narrower screen would - a
+// 1920px monitor at 175% scaling renders roughly like an ~1100px-wide screen to this CSS, which
+// sits well above the old 640px (true-phone-only) breakpoint this rule used to live behind, so a
+// scaled desktop never got the safety net a real phone did. Below this width, fall back to the
+// same scrollable-table pattern every other grid in this app already uses instead of losing a
+// column - matches the proven 960px floor from the old phone-only rule, just triggered early
+// enough to also catch a heavily OS-scaled desktop, not only a small physical screen.
+@media (max-width: 1200px) {
+  .scope-table { min-width: 960px; }
 }

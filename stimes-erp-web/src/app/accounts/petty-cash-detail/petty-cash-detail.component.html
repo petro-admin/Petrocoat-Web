@@ -1,0 +1,153 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · {{ pageTitle }}</div>
+      <h2>{{ isNew ? 'New ' + pageTitle : form.get('voucherNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+    <div class="card">
+      <div class="card-body">
+        <div class="mode-radios">
+          <label class="radio-option" [class.active]="form.get('pettyCashMode')?.value === 'Direct'">
+            <input type="radio" name="pettyCashMode" [checked]="form.get('pettyCashMode')?.value === 'Direct'" (change)="setMode('Direct')" />
+            <span>Direct</span>
+          </label>
+          <label class="radio-option" [class.active]="form.get('pettyCashMode')?.value === 'Request'">
+            <input type="radio" name="pettyCashMode" [checked]="form.get('pettyCashMode')?.value === 'Request'" (change)="setMode('Request')" />
+            <span>Request</span>
+          </label>
+        </div>
+
+        <div class="field-grid four">
+          <div>
+            <label>Doc No.</label>
+            <input formControlName="voucherNo" readonly />
+          </div>
+          <div>
+            <label>Date <span class="required">*</span></label>
+            <input type="date" formControlName="voucherDate" />
+          </div>
+          <div>
+            <label>{{ paidFromLabel }} <span class="required">*</span></label>
+            <app-filter-select formControlName="paidFromCode" [options]="paidFromOptions()" placeholder="Search Account"></app-filter-select>
+          </div>
+          <div>
+            <label>Document Upload</label>
+            <label class="doc-upload-box" [class.uploading]="uploadingDocument()">
+              <input type="file" accept="image/*,application/pdf" (change)="onDocumentSelected($event)" [disabled]="uploadingDocument()" hidden />
+              <span>{{ uploadingDocument() ? 'Uploading...' : 'Browse, drag document, or take a photo' }}</span>
+            </label>
+          </div>
+        </div>
+
+        @if (documents().length > 0) {
+          <div class="doc-chip-list">
+            @for (doc of documents(); track doc.filePath; let i = $index) {
+              <span class="doc-chip">
+                <a (click)="viewDocument(doc)">📄 {{ doc.fileName }}</a>
+                <button type="button" (click)="removeDocument(i)">✕</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ pageTitle }} Details</div>
+      <div class="table-scroll" formArrayName="lines">
+        <table class="petty-cash-table">
+          <colgroup>
+            <col style="width: 40px" />
+            <col style="width: 130px" />
+            <col style="width: 130px" />
+            <col style="width: 170px" />
+            <col style="width: 190px" />
+            <col style="width: 170px" />
+            <col style="width: 170px" />
+            <col style="width: 190px" />
+            <col style="width: 110px" />
+            <col style="width: 110px" />
+            <col style="width: 40px" />
+            <col style="width: 110px" />
+            <col style="width: 110px" />
+            <col style="width: 120px" />
+            <col style="width: 40px" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>No</th><th>Date</th><th>Reference No</th><th>Project Name</th><th>Expense</th>
+              <th>Narration</th><th>Cost Center</th><th>Supplier Name</th><th>TRN No</th><th>Amount</th>
+              <th>Vat</th><th>Vat Amount</th><th>Total</th><th>Attachment</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of lines.controls; track $index; let i = $index) {
+              <tr [formGroupName]="i">
+                <td>{{ i + 1 }}</td>
+                <td><input type="date" formControlName="lineDate" /></td>
+                <td><input formControlName="referenceNo" placeholder="Reference No" /></td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="projectSoCode" [options]="salesOrderOptions()" placeholder="Search Project"></app-filter-select>
+                </td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="accountHeadCode" [options]="headOptions()" placeholder="Search Account"></app-filter-select>
+                </td>
+                <td><input formControlName="narration" placeholder="Enter Narration" /></td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="costCenterCode" [options]="costCenterOptions()" placeholder="Enter cost category"></app-filter-select>
+                </td>
+                <td class="head-cell">
+                  <app-filter-select formControlName="supplierCode" [options]="supplierOptions()" placeholder="Select Supplier"></app-filter-select>
+                </td>
+                <td><input formControlName="trn" placeholder="Trn No" /></td>
+                <td><input type="number" formControlName="amount" class="amount-input" placeholder="Enter Amount" /></td>
+                <td class="vat-cell"><input type="checkbox" formControlName="vatApplicable" /></td>
+                <td>
+                  @if (line.get('vatApplicable')?.value) {
+                    <input type="number" formControlName="vatAmount" class="amount-input" placeholder="Vat Amount" />
+                  }
+                </td>
+                <td class="amount-input">{{ formatAmount(lineTotal(line.value)) }}</td>
+                <td>
+                  @if (line.get('attachmentPath')?.value) {
+                    <span class="attachment-chip" (click)="viewLineAttachment(i)">📎 {{ line.get('attachmentName')?.value }}</span>
+                  } @else {
+                    <label class="attachment-btn" [class.uploading]="uploadingLineAttachment() === i">
+                      <input type="file" accept="image/*,application/pdf" (change)="onLineAttachmentSelected(i, $event)" [disabled]="uploadingLineAttachment() === i" hidden />
+                      <span>{{ uploadingLineAttachment() === i ? '...' : '📎' }}</span>
+                    </label>
+                  }
+                </td>
+                <td><button type="button" class="remove-btn" (click)="removeLine(i)">✕</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="add-line-btn" (click)="addLine()">+ Add Line</button>
+    </div>
+
+    <div class="card">
+      <div class="card-body grand-total-body">
+        <label>Grand Total</label>
+        <div class="grand-total-box">{{ currencyShortName() }} {{ formatAmount(grandTotal()) }}</div>
+      </div>
+    </div>
+  </form>
+  }
+</div>

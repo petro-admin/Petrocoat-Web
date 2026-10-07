@@ -1,0 +1,175 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  input, button {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  button {
+    cursor: pointer;
+    transition: background .15s ease;
+    &:hover { background: var(--surface-sunken); }
+    &.primary { background: var(--accent); color: #fff; border-color: transparent; &:hover { background: var(--accent-dark); } }
+  }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.table-scroll {
+  overflow: auto;
+  max-height: 75vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; white-space: nowrap; }
+
+.day-row td {
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: .02em;
+  padding: 8px 12px;
+}
+
+.empty { text-align: center; color: var(--ink-faint); padding: 24px; }
+
+tfoot td {
+  border-bottom: none;
+  border-top: 2px solid var(--border-strong);
+  padding: 10px 12px;
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+}
+.total-label { text-align: right; font-weight: 700; color: var(--ink-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.total-value { font-weight: 700; color: var(--accent); font-size: 14px; }
+
+.print-only { display: none; }
+
+// Matches desktop's own Excel export layout (SL NO / VEHICLE NO / KM / FUEL CONSUMPTION / DRIVER /
+// TRIP START TIME / TRIP END TIME, grouped by day) - simpler than the on-screen table's extra
+// First/Last Site columns, so print uses its own table instead of printing the screen one.
+.print-table {
+  display: none;
+  border-collapse: collapse;
+  width: 100%;
+
+  th {
+    background: #ffe600;
+    color: #1c2027;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    text-align: left;
+    border: 1px solid #999;
+  }
+
+  td { padding: 5px 8px; border: 1px solid #999; font-size: 12px; }
+
+  .day-row td {
+    background: #dbeaf5;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 12px;
+  }
+}
+
+@media print {
+  :host { background: #fff; }
+  .page { background: #fff; padding: 0; }
+  .filters, .hint { display: none !important; }
+  header { box-shadow: none; border: none; padding: 0 0 8px; }
+  .print-only { display: block; color: var(--ink-muted); font-size: 12.5px; margin: 0 0 10px; }
+  .table-scroll { display: none; }
+  .print-table { display: table; }
+}

@@ -1,0 +1,407 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <div class="topbar">
+    <div>
+      <h2>{{ isNew ? 'New Manpower Schedule' : 'Edit Manpower Schedule' }}</h2>
+      <span class="docno" *ngIf="form.get('docNo')?.value as dn">{{ dn }}</span>
+    </div>
+    <div class="topbar-actions no-print">
+      @if (!isNew) {
+        <button class="secondary" type="button" (click)="copyAsNew()" [disabled]="saving() || busy()">Copy</button>
+        <button class="secondary" type="button" (click)="print()">Print</button>
+        <button class="secondary" type="button" [disabled]="exporting()" (click)="exportToExcel()">
+          {{ exporting() ? 'Exporting...' : 'Export to Excel' }}
+        </button>
+      }
+      <button class="secondary" type="button" (click)="cancel()">Cancel</button>
+      <button class="primary" type="button" [disabled]="saving() || busy() || !canSave()" [title]="!canSave() ? (isApproved() ? 'Approved - cannot be updated' : 'You do not have permission to add') : ''" (click)="save()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-overlay"><span class="spinner"></span><span>Loading...</span></div>
+  }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <!-- ============ PRINT-ONLY (matches ReportManpowerSchedule.rdlc) ============ -->
+  <!-- Hidden on screen, shown only via @media print - desktop's own print report groups by job
+       with Sl No/SONo/Driver Name/Vehicle No/Client Name merged across every employee row in that
+       job, which the on-screen editable grid can't represent directly (it's one Sl No per line,
+       not per job), so this is a separate rendering rather than reusing the on-screen table. -->
+  <div class="print-only print-header-box">
+    <div class="print-title">MANPOWER SCHEDULE</div>
+    <table class="print-info-table">
+      <tr><td class="label">Branch :</td><td colspan="3">{{ settings.branchName() }}</td></tr>
+      <tr>
+        <td class="label">Doc No :</td><td>{{ form.get('docNo')?.value }}</td>
+        <td class="label">Date :</td><td>{{ form.get('docDate')?.value | date:'dd-MM-yyyy' }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <table class="print-table">
+    <thead>
+      <tr>
+        <th>Sl No</th><th>SONo</th><th>Driver Name</th><th>Vehicle No</th><th>Client Name</th>
+        <th>Employee Name</th><th>Supervisor</th><th>Material</th><th>Consumable</th><th>Machinery</th><th>Shift</th><th>Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (group of printGroups(); track group.slNo) {
+        @for (emp of group.employees; track $index; let ei = $index) {
+          <tr>
+            @if (ei === 0) {
+              <td [attr.rowspan]="group.employees.length">{{ group.slNo }}</td>
+              <td [attr.rowspan]="group.employees.length">{{ group.soNo }}</td>
+              <td [attr.rowspan]="group.employees.length">{{ group.driverName }}</td>
+              <td [attr.rowspan]="group.employees.length">{{ group.vehicleNo }}</td>
+              <td [attr.rowspan]="group.employees.length">{{ group.clientName }}</td>
+            }
+            <td>{{ emp.employeeName }}</td>
+            <td>{{ emp.supervisor }}</td>
+            <td>{{ emp.material }}</td>
+            <td>{{ emp.consumable }}</td>
+            <td>{{ emp.machinery }}</td>
+            <td>{{ emp.shift }}</td>
+            <td>{{ emp.remarks }}</td>
+          </tr>
+        }
+        @if (group.employees.length === 0) {
+          <tr>
+            <td>{{ group.slNo }}</td><td>{{ group.soNo }}</td><td>{{ group.driverName }}</td><td>{{ group.vehicleNo }}</td><td>{{ group.clientName }}</td>
+            <td colspan="7"></td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+
+  <form [formGroup]="form" [class.is-loading]="loading()">
+
+    <!-- ============ HEADER ============ -->
+    <section class="card no-print">
+      <div class="grid-2">
+        <div class="field"><label>Doc No</label><input formControlName="docNo" /></div>
+        <div class="field"><label>Doc Date *</label><app-date-input formControlName="docDate" /></div>
+      </div>
+    </section>
+
+    <!-- ============ SCHEDULE LINES ============ -->
+    <section class="card">
+      <div class="grid-toolbar no-print">
+        <h3>Schedule</h3>
+        <div class="toolbar-actions">
+          <app-filter-select class="transfer-job" [options]="jobs()" valueKey="JobCode" labelKey="JobNo" placeholder="Transfer to Job..."
+            [ngModel]="transferJobCode" [ngModelOptions]="{standalone: true}" (valueChange)="transferJobCode = $event"></app-filter-select>
+          <button type="button" class="secondary" [disabled]="!anyLinesChecked()" (click)="transferSelected()">SO Transfer</button>
+          <button type="button" class="add-btn" (click)="openEmployeePicker()">+ Add Employees</button>
+        </div>
+      </div>
+
+      <div class="table-scroll schedule-table-scroll">
+        <table formArrayName="lines">
+          <thead>
+            <tr>
+              <th class="chk-col"></th><th>Sl</th><th>Job No</th><th>Driver Name</th><th>Vehicle</th><th>Description</th>
+              <th>Client Name</th><th>Source</th><th>Employee Name</th><th>Supervisor</th>
+              <th>Material</th><th>Consumable</th><th>Machinery</th><th>Shift</th><th>Remarks</th><th class="action-col"></th>
+            </tr>
+            <tr class="filter-row no-print">
+              <th></th><th></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().jobNo" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('jobNo', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().driverName" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('driverName', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().vehicle" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('vehicle', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().description" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('description', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().clientName" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('clientName', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().source" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('source', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().employeeName" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('employeeName', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().supervisor" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('supervisor', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().material" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('material', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().consumable" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('consumable', $event)" /></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().machinery" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('machinery', $event)" /></th>
+              <th></th>
+              <th><input type="text" placeholder="Filter..." [ngModel]="lineFilters().remarks" [ngModelOptions]="{standalone: true}" (ngModelChange)="updateLineFilter('remarks', $event)" /></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (group of lineGroups(); track group.jobKey) {
+              <tr class="group-row job-group">
+                <td colspan="15">{{ group.label }}</td>
+              </tr>
+              @for (item of group.rows; track item.control) {
+                <tr [formGroupName]="item.index">
+                  <td class="chk-col"><input type="checkbox" formControlName="chkYesNo" /></td>
+                  <td>{{ item.control.get('slNo')?.value }}</td>
+                  <!-- Job is set once, either by "+ Add Employees" or by "SO Transfer" - not
+                       directly editable in the grid, matching desktop's plain-text Job No column. -->
+                  <td>{{ item.control.get('jobNo')?.value || '-' }}</td>
+                  <td class="col-wide">
+                    <app-filter-select [options]="drivers()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Driver-"
+                      formControlName="driverCode"></app-filter-select>
+                  </td>
+                  <td class="col-wide">
+                    <app-filter-select [options]="vehicles()" valueKey="VehicleCode" labelKey="RegistrationNo" placeholder="-Vehicle-"
+                      formControlName="vehicleCode"></app-filter-select>
+                  </td>
+                  <td>
+                    @if (!item.control.get('jobCode')?.value) {
+                      <input formControlName="description" placeholder="Description" />
+                    } @else {
+                      -
+                    }
+                  </td>
+                  <td>{{ customerName(item.control) }}</td>
+                  <td class="col-wide">
+                    <app-filter-select [options]="sources()" valueKey="SourceCode" labelKey="SourceName" placeholder="-Source-"
+                      formControlName="sourceCode"></app-filter-select>
+                  </td>
+                  <td class="col-wide">
+                    <app-filter-select [options]="employees()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Employee-"
+                      formControlName="employeeCode" (valueChange)="onLineEmployeeChanged(item.index, $event)"></app-filter-select>
+                  </td>
+                  <td class="col-wide">
+                    <app-filter-select [options]="supervisors()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Supervisor-"
+                      formControlName="supervisorCode"></app-filter-select>
+                  </td>
+                  <td><input formControlName="material" /></td>
+                  <td><input formControlName="consumable" /></td>
+                  <td><input formControlName="machinery" /></td>
+                  <td>
+                    <select formControlName="shiftCode">
+                      @for (s of shifts(); track rowValue(s, 'ShiftCode')) {
+                        <option [ngValue]="rowValue(s, 'ShiftCode')">{{ rowValue(s, 'ShiftName') }}</option>
+                      }
+                    </select>
+                  </td>
+                  <td><input formControlName="remarks" /></td>
+                  <td class="action-col"><button type="button" class="remove-btn" (click)="removeLineRow(item.index)">✕</button></td>
+                </tr>
+              }
+            }
+            @if (lines.length === 0) {
+              <tr><td colspan="15" class="empty">No rows yet — click "+ Add Employees"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-footer">
+        <span><strong>{{ distinctJobCount() }}</strong> Job(s)</span>
+        <span><strong>{{ lines.controls.length }}</strong> Employee(s)</span>
+      </div>
+    </section>
+
+    <!-- ============ IDLE EMPLOYEES ============ -->
+    <section class="card">
+      <div class="grid-toolbar no-print">
+        <h3>Idle Employees</h3>
+        <button type="button" class="add-btn" (click)="openIdlePicker()">+ Add Idle Employees</button>
+      </div>
+
+      <div class="table-scroll">
+        <table formArrayName="idleEmployees">
+          <thead><tr><th>Sl</th><th>Employee</th><th>Status</th><th>Remarks</th><th class="action-col"></th></tr></thead>
+          <tbody>
+            @for (row of idleEmployees.controls; track row; let i = $index) {
+              <tr [formGroupName]="i">
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td class="col-wide">
+                  <app-filter-select [options]="employees()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Employee-"
+                    formControlName="employeeCode" (valueChange)="onIdleEmployeeChanged(i, $event)"></app-filter-select>
+                </td>
+                <td>
+                  <select formControlName="statusCode">
+                    @for (s of idleEmpStatuses(); track rowValue(s, 'StatusCode')) {
+                      <option [ngValue]="rowValue(s, 'StatusCode')">{{ rowValue(s, 'Status') }}</option>
+                    }
+                  </select>
+                </td>
+                <td><input formControlName="remarks" /></td>
+                <td class="action-col"><button type="button" class="remove-btn" (click)="removeIdleRow(i)">✕</button></td>
+              </tr>
+            }
+            @if (idleEmployees.length === 0) {
+              <tr><td colspan="5" class="empty">No idle employees</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ APPROVAL ============ -->
+    @if (approvalEnabled()) {
+      <section class="card approval-card">
+        <h3>Approval</h3>
+        @if (isNew) {
+          <p class="hint">Save the record first to use the approval workflow.</p>
+        } @else if (!approvalVisible()) {
+          <p class="hint">Approval is not applicable for you on this record.</p>
+        } @else {
+          <div class="approval-status">
+            <span class="status-badge" [class.status-approved]="read(approvalAction(), 'CurrentStatus') === 'A'"
+                  [class.status-denied]="read(approvalAction(), 'CurrentStatus') === 'D'">
+              {{ read(approvalAction(), 'CurrentStatus') === 'A' ? 'Approved' : read(approvalAction(), 'CurrentStatus') === 'D' ? 'Denied' : 'Pending' }}
+            </span>
+            <button type="button" class="secondary no-print" (click)="toggleLock()" [disabled]="approvalBusy()">
+              {{ read(approvalAction(), 'IsLocked') === 'L' ? 'Unlock' : 'Lock' }}
+            </button>
+          </div>
+
+          <div class="field full-width no-print">
+            <label>Comment</label>
+            <textarea rows="2" [value]="approvalComment()" (input)="updateApprovalComment($any($event.target).value)"></textarea>
+          </div>
+
+          <div class="approval-actions no-print">
+            <button type="button" class="approve-btn" [disabled]="approvalBusy() || read(approvalAction(), 'ApproveIsEnable') !== 'Y'" (click)="approve()">Approve</button>
+            <button type="button" class="deny-btn" [disabled]="approvalBusy() || read(approvalAction(), 'DenayIsEnable') !== 'Y'" (click)="deny()">Deny</button>
+            <button type="button" class="secondary" (click)="loadApprovalHistory()">View History</button>
+          </div>
+
+          @if (approvalHistory()) {
+            <div class="history-block">
+              <h4>Action History</h4>
+              @for (table of approvalHistory(); track $index) {
+                <div class="table-scroll">
+                  <table>
+                    @if (table.length > 0) {
+                      <thead><tr>@for (key of objectKeys(table[0]); track key) {<th>{{ key }}</th>}</tr></thead>
+                      <tbody>
+                        @for (row of table; track $index) {
+                          <tr>@for (key of objectKeys(table[0]); track key) {<td>{{ row[key] }}</td>}</tr>
+                        }
+                      </tbody>
+                    }
+                  </table>
+                </div>
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+  </form>
+
+  <!-- ============ ADD EMPLOYEES MODAL ============ -->
+  <!-- Matches desktop's ManpowerSchedule_EmployeeList modal: Job/Client Name/Supervisor/Driver
+       Name/Vehicle are set once here and applied to every employee checked below. -->
+  @if (showEmployeePicker()) {
+    <div class="modal-backdrop" (click)="closeEmployeePicker()">
+      <div class="modal-box modal-box-wide" (click)="$event.stopPropagation()">
+        <h3>Add Employees</h3>
+
+        <div class="grid-2">
+          <div class="field">
+            <label>Job No *</label>
+            <app-filter-select [options]="jobs()" valueKey="JobCode" labelKey="JobNo" placeholder="-Select Job-"
+              [ngModel]="pickerJobCode" [ngModelOptions]="{standalone: true}" (valueChange)="onPickerJobChanged($event)"></app-filter-select>
+            @if (!pickerJobCode) {
+              <small class="field-hint required-hint">Pick a Job before selecting employees</small>
+            }
+          </div>
+          <div class="field">
+            <label>Client Name</label>
+            <input [value]="pickerClientName()" readonly />
+          </div>
+          <div class="field">
+            <label>Supervisor</label>
+            <app-filter-select [options]="supervisors()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Supervisor-"
+              [ngModel]="pickerSupervisorCode" [ngModelOptions]="{standalone: true}" (valueChange)="pickerSupervisorCode = $event"></app-filter-select>
+          </div>
+          <div class="field">
+            <label>Driver Name</label>
+            <app-filter-select [options]="drivers()" valueKey="EmployeeCode" labelKey="EmpFullName" placeholder="-Driver-"
+              [ngModel]="pickerDriverCode" [ngModelOptions]="{standalone: true}" (valueChange)="pickerDriverCode = $event"></app-filter-select>
+          </div>
+          <div class="field">
+            <label>Vehicle</label>
+            <app-filter-select [options]="vehicles()" valueKey="VehicleCode" labelKey="RegistrationNo" placeholder="-Vehicle-"
+              [ngModel]="pickerVehicleCode" [ngModelOptions]="{standalone: true}" (valueChange)="pickerVehicleCode = $event"></app-filter-select>
+          </div>
+        </div>
+
+        @if (pickerLoading()) {
+          <p class="hint">Loading candidates...</p>
+        } @else {
+          <div class="table-scroll modal-table">
+            <table>
+              <thead>
+                <tr><th></th><th>SL</th><th>Source</th><th>Employee Name</th><th>Designation</th></tr>
+                <tr class="filter-row">
+                  <th></th><th></th>
+                  <th><input type="text" placeholder="Filter..." [ngModel]="pickerFilters().source" [ngModelOptions]="{standalone: true}" (ngModelChange)="updatePickerFilter('source', $event)" /></th>
+                  <th><input type="text" placeholder="Filter..." [ngModel]="pickerFilters().employeeName" [ngModelOptions]="{standalone: true}" (ngModelChange)="updatePickerFilter('employeeName', $event)" /></th>
+                  <th><input type="text" placeholder="Filter..." [ngModel]="pickerFilters().designation" [ngModelOptions]="{standalone: true}" (ngModelChange)="updatePickerFilter('designation', $event)" /></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of pickerFilteredCandidates(); track rowValue(c, 'EmployeeCode'); let i = $index) {
+                  <tr [class.row-disabled]="!pickerJobCode" (click)="pickerJobCode && togglePickerChecked(rowValue(c, 'EmployeeCode'))">
+                    <td><input type="checkbox" [disabled]="!pickerJobCode" [checked]="pickerChecked().has(toNumber(rowValue(c, 'EmployeeCode')))" (click)="$event.stopPropagation()" (change)="togglePickerChecked(rowValue(c, 'EmployeeCode'))" /></td>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ rowValue(c, 'SourceName') }}</td>
+                    <td>{{ rowValue(c, 'EmpFullName') }}</td>
+                    <td>{{ rowValue(c, 'Designation') }}</td>
+                  </tr>
+                }
+                @if (pickerFilteredCandidates().length === 0) {
+                  <tr><td colspan="5" class="empty">No available employees for this date</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <div class="modal-actions">
+          <button type="button" class="secondary" (click)="closeEmployeePicker()">Cancel</button>
+          <button type="button" class="primary" [disabled]="busy() || !pickerJobCode || pickerChecked().size === 0"
+            [title]="!pickerJobCode ? 'Pick a Job first' : (pickerChecked().size === 0 ? 'Check at least one employee' : '')"
+            (click)="addSelectedEmployees()">Add Selected</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ============ ADD IDLE EMPLOYEES MODAL ============ -->
+  @if (showIdlePicker()) {
+    <div class="modal-backdrop" (click)="closeIdlePicker()">
+      <div class="modal-box" (click)="$event.stopPropagation()">
+        <h3>Add Idle Employees</h3>
+
+        @if (idlePickerLoading()) {
+          <p class="hint">Loading candidates...</p>
+        } @else {
+          <div class="table-scroll modal-table">
+            <table>
+              <thead><tr><th></th><th>Employee</th></tr></thead>
+              <tbody>
+                @for (c of idlePickerCandidates(); track rowValue(c, 'EmployeeCode')) {
+                  <tr (click)="toggleIdlePickerChecked(rowValue(c, 'EmployeeCode'))">
+                    <td><input type="checkbox" [checked]="idlePickerChecked().has(toNumber(rowValue(c, 'EmployeeCode')))" (click)="$event.stopPropagation()" (change)="toggleIdlePickerChecked(rowValue(c, 'EmployeeCode'))" /></td>
+                    <td>{{ rowValue(c, 'EmpFullName') }}</td>
+                  </tr>
+                }
+                @if (idlePickerCandidates().length === 0) {
+                  <tr><td colspan="2" class="empty">No available employees for this date</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <div class="modal-actions">
+          <button type="button" class="secondary" (click)="closeIdlePicker()">Cancel</button>
+          <button type="button" class="primary" (click)="addSelectedIdleEmployees()">Add Selected</button>
+        </div>
+      </div>
+    </div>
+  }
+  }
+</div>

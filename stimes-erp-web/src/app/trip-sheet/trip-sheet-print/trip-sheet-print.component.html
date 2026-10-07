@@ -1,0 +1,83 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <span class="toolbar-hint">"Download PDF" opens the print dialog — choose "Save as PDF" as the destination</span>
+    <button type="button" (click)="print()">Download PDF</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    <h1 class="report-title">TRIP SHEET</h1>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">Doc No :</td><td>{{ rowValue(header(), 'DocNo') }}</td>
+        <td class="label">Doc Date :</td><td>{{ rowValue(header(), 'DocDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Driver :</td><td>{{ driverName() }}</td>
+        <td class="label">Vehicle :</td><td>{{ registrationNo() }}</td>
+      </tr>
+      <tr>
+        <td class="label">Route Start Time :</td><td>{{ rowValue(header(), 'StartTime') | date:'dd-MM-yyyy HH:mm' }}</td>
+        <td class="label">Start Odometer :</td><td>{{ rowValue(header(), 'StartOdometer') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Start Location :</td><td colspan="3">{{ rowValue(header(), 'StartLocation') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Camp Reach Time :</td><td>{{ rowValue(header(), 'EndTime') | date:'dd-MM-yyyy HH:mm' }}</td>
+        <td class="label">End Odometer :</td><td>{{ rowValue(header(), 'EndOdometer') }}</td>
+      </tr>
+      <tr>
+        <td class="label">End Location :</td><td colspan="3">{{ rowValue(header(), 'EndLocation') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Fuel Consumption :</td><td>{{ rowValue(header(), 'FuelConsumption') }}</td>
+        <td class="label">Status :</td><td>{{ rowValue(header(), 'StatusCode') === 1 ? 'Completed' : 'Open' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Remarks :</td><td colspan="3">{{ rowValue(header(), 'Remarks') }}</td>
+      </tr>
+    </table>
+
+    <h2 class="section-title">Trip Legs</h2>
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Sl</th><th>Time</th><th>Job No</th><th>Location</th><th>Starting KM</th><th>Ending KM</th><th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (leg of legs(); track $index) {
+            <tr>
+              <td>{{ rowValue(leg, 'SlNo') }}</td>
+              <td>{{ rowValue(leg, 'LegTime') | date:'HH:mm' }}</td>
+              <td>{{ rowValue(leg, 'JobNo') }}</td>
+              <td class="text-left">{{ rowValue(leg, 'Location') }}</td>
+              <td>{{ rowValue(leg, 'StartKm') }}</td>
+              <td>{{ rowValue(leg, 'EndKm') }}</td>
+              <td class="text-left">{{ rowValue(leg, 'Remarks') }}</td>
+            </tr>
+          }
+          @if (legs().length === 0) {
+            <tr><td colspan="7" class="empty">No legs recorded</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">Driver Signature</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">Supervisor Signature</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+    </div>
+  }
+</div>

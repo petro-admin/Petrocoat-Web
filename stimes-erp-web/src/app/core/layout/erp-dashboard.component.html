@@ -45,11 +45,11 @@
 
         <label>
           <span>From</span>
-          <input type="date" [(ngModel)]="fromDate" name="fromDate" />
+          <app-date-input [(ngModel)]="fromDate" name="fromDate" />
         </label>
         <label>
           <span>To</span>
-          <input type="date" [(ngModel)]="toDate" name="toDate" />
+          <app-date-input [(ngModel)]="toDate" name="toDate" />
         </label>
         <button type="submit" [disabled]="loading()">{{ loading() ? 'Loading...' : 'Apply' }}</button>
       </form>

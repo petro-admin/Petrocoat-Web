@@ -13,10 +13,12 @@ namespace StimesErp.Api.Services
     public class ApprovalService
     {
         private readonly SqlHelper _db;
+        private readonly WebAuditService _audit;
 
-        public ApprovalService(SqlHelper db)
+        public ApprovalService(SqlHelper db, WebAuditService audit)
         {
             _db = db;
+            _audit = audit;
         }
 
         // Payroll_Appreciation.GetApprovalSettingsHDR_By_FormClassName - non-empty result means
@@ -65,7 +67,9 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@Action", SqlDbType.VarChar, action, 50),
                 SqlHelper.Param("@Comment", SqlDbType.VarChar, comment ?? "", 1000)
             };
-            return _db.DataTransactionsByProcedure("[usp_ManageAction]", p);
+            var result = _db.DataTransactionsByProcedure("[usp_ManageAction]", p);
+            _audit.LogEdit("Approvals", $"Transaction Code {transactionCode} (Module {moduleCode}) - {activity}/{action}" + (string.IsNullOrWhiteSpace(comment) ? "" : $" ({comment})"));
+            return result;
         }
 
         // Payroll_Appreciation.VerifyTransactionWithApprovalStatus - "CNT" to count other users'
@@ -89,7 +93,9 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@TransactionCode", SqlDbType.Int, transactionCode),
                 SqlHelper.Param("@ModuleCode", SqlDbType.Int, moduleCode)
             };
-            return _db.DataTransactionsByProcedure("usp_admin_DeleteRequestAndActionStatus", p);
+            var result = _db.DataTransactionsByProcedure("usp_admin_DeleteRequestAndActionStatus", p);
+            _audit.LogDelete("Approvals", $"Approval request/status for Transaction Code {transactionCode} (Module {moduleCode}) deleted");
+            return result;
         }
 
         // Cls_Authorization.GetApprovalStatus_and_History - feeds the "View Action History" dialog.

@@ -15,5 +15,6 @@ namespace StimesErp.Api.Models
         public int CompanyCode { get; set; }
         public int BranchCode { get; set; }
         public int PeriodId { get; set; }
+        public int EmpCode { get; set; }
     }
 }

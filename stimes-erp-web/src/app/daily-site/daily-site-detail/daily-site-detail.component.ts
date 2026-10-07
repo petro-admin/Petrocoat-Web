@@ -6,13 +6,21 @@ import { forkJoin } from 'rxjs';
 import { DailySiteService } from '../services/daily-site.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { ApprovalService } from '../../core/services/approval.service';
+import { AuthService } from '../../core/services/auth.service';
+import { UserRightsService, UserRights, NO_RIGHTS } from '../../core/services/user-rights.service';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
-type TabKey = 'basic' | 'scope' | 'material' | 'manhours' | 'consumables' | 'machineries';
+type TabKey = 'basic' | 'scope' | 'material' | 'manhours' | 'consumables' | 'machineries' | 'approval';
+
+// Matches this.GetType().ToString() in the desktop app's DailySite.xaml.cs - the key
+// usp_GetUserRightSecurity / usp_admin_GetApprovalSettingsHDR_By_FormClassName look up by.
+const FORM_CLASS_NAME = 'Stimes.Erp.App.Win.Production.DailySite';
 
 @Component({
   selector: 'app-daily-site-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DateInputComponent],
   templateUrl: './daily-site-detail.component.html',
   styleUrl: './daily-site-detail.component.scss'
 })
@@ -45,7 +53,7 @@ export class DailySiteDetailComponent implements OnInit {
   // instead of TodayConsumed directly - all other units use TodayConsumed as-is.
   private readonly packSizeDivideUnitCodes = [6, 23, 35, 161, 171];
 
-  tabs: { key: TabKey; label: string }[] = [
+  private baseTabs: { key: TabKey; label: string }[] = [
     { key: 'basic', label: 'Basic Details' },
     { key: 'scope', label: 'Scope of Work' },
     { key: 'material', label: 'Material' },
@@ -54,7 +62,39 @@ export class DailySiteDetailComponent implements OnInit {
     { key: 'manhours', label: 'Manhours' }
   ];
 
+  tabs(): { key: TabKey; label: string }[] {
+    return this.approvalEnabled() ? [...this.baseTabs, { key: 'approval', label: 'Approval' }] : this.baseTabs;
+  }
+
+  // Approval workflow (Lock/Approve/Deny) - matches desktop's ISApprove_userandform / the
+  // AdminApprovalSettings.ManageFormApprovals calls in DailySite.xaml.cs's LockButton_Click /
+  // ApproveButton_Click / DenyButton_Click.
+  approvalEnabled = signal(false);
+  moduleCode = 0;
+  approvalVisible = signal(false);
+  approvalAction = signal<any>(null);
+  approvalHistory = signal<any[][] | null>(null);
+  approvalComment = signal('');
+  approvalBusy = signal(false);
+
+  // Matches desktop's CheckPermission() (myUserRights.ACCESS/ADD/DELETE).
+  rights = signal<UserRights>(NO_RIGHTS);
+  rightsLoaded = signal(false);
+
   form!: FormGroup;
+
+  // AdminUserCategoryInfo: 1 = ADMIN. A normal user (any other UCatCode) can only Update/Delete
+  // a Daily Site within 24 hours of its own Doc Date - past that the record is locked from
+  // further changes by anyone except an ADMIN-category user, who is always exempt. Same
+  // enforcement also runs server-side (DailySiteService.CheckEditWindow) - this is just so the
+  // buttons themselves reflect it instead of only failing after a round trip.
+  get isEditLocked(): boolean {
+    if (this.isNew || this.auth.currentUser()?.uCatCode === 1) return false;
+    const docDate = this.form.get('docDate')?.value;
+    if (!docDate) return false;
+    const hours = (Date.now() - new Date(docDate).getTime()) / 3600000;
+    return hours > 24;
+  }
 
   get scopeOfWork(): FormArray { return this.form.get('scopeOfWork') as FormArray; }
   get material(): FormArray { return this.form.get('material') as FormArray; }
@@ -69,7 +109,10 @@ export class DailySiteDetailComponent implements OnInit {
     private router: Router,
     private dailySiteService: DailySiteService,
     private settings: SettingsService,
-    private confirmDialog: ConfirmDialogService
+    private confirmDialog: ConfirmDialogService,
+    private approvalService: ApprovalService,
+    private auth: AuthService,
+    private userRightsService: UserRightsService
   ) {
     this.form = this.fb.group({
       docNo: [{ value: '', disabled: true }],
@@ -86,6 +129,7 @@ export class DailySiteDetailComponent implements OnInit {
       location: [''],
       project: [''],
       startTime: [''],
+      closeTime: [''],
       basicHrs: [0],
       supervisor: [''],
       supervisorName: [''],
@@ -121,19 +165,107 @@ export class DailySiteDetailComponent implements OnInit {
     this.isNew = this.id === 0;
 
     if (this.isNew) {
-      const today = new Date().toISOString().substring(0, 10);
+      // Matches desktop's Clear(): DatePickerOne.Text = StaticClass.ProcessingDate - the new
+      // record's Date field defaults from Processing Date, not the browser's system date.
+      const processingDate = this.settings.processingDate() ?? new Date();
+      const today = processingDate.toISOString().substring(0, 10);
       this.dailySiteService.generateDocNo(today).subscribe(res => {
         this.form.patchValue({ docNo: res.docNo, docDate: today });
       });
       this.loadSalesOrders();
+      // Re-load whenever Doc Date changes - a supervisor's SNAG-scheduled (ManpowerSchedule) jobs
+      // are only resolvable once we know which date is actually being logged for.
+      this.form.get('docDate')?.valueChanges.subscribe(() => this.loadSalesOrders());
     } else {
       this.loadExisting();
     }
     this.loadLookups();
+    this.loadRights();
+    this.loadApprovalSettings();
+
+    this.form.get('docDate')?.valueChanges.subscribe(() => this.checkExistingForJobAndDate());
+  }
+
+  private loadApprovalSettings(): void {
+    this.approvalService.getSettings(FORM_CLASS_NAME).subscribe({
+      next: settings => {
+        this.approvalEnabled.set(settings.isApproval);
+        this.moduleCode = settings.moduleCode;
+        if (settings.isApproval && !this.isNew) this.loadApprovalStatus();
+      },
+      error: () => {}
+    });
+  }
+
+  private loadApprovalStatus(): void {
+    this.approvalService.getStatus(this.moduleCode, this.id).subscribe({
+      next: status => {
+        this.approvalVisible.set(status.visible);
+        this.approvalAction.set(status.action ?? null);
+      },
+      error: () => {}
+    });
+  }
+
+  private loadRights(): void {
+    this.userRightsService.getRights(FORM_CLASS_NAME).subscribe({
+      next: rights => { this.rights.set(rights); this.rightsLoaded.set(true); },
+      error: () => { this.rights.set(NO_RIGHTS); this.rightsLoaded.set(true); }
+    });
+  }
+
+  // ---------- Approval workflow ----------
+  async toggleLock(): Promise<void> {
+    if (this.isNew) return;
+    const locked = this.read(this.approvalAction(), 'IsLocked') === 'L';
+    const confirmMsg = locked ? 'Are you sure to Unlock the Requisition ?' : 'Are you sure to Lock the Requisition ?';
+    if (!(await this.confirmDialog.confirm(confirmMsg))) return;
+
+    this.approvalBusy.set(true);
+    this.approvalService.manageAction(this.moduleCode, this.id, 'L', locked ? 'U' : 'L', this.approvalComment()).subscribe({
+      next: (res) => {
+        this.approvalBusy.set(false);
+        this.confirmDialog.notify(res?.result ?? '');
+        this.loadApprovalStatus();
+      },
+      error: () => { this.approvalBusy.set(false); this.errorMessage.set('Could not update lock status.'); }
+    });
+  }
+
+  approve(): void { this.actOnApproval('A', 'Approved!!'); }
+  deny(): void { this.actOnApproval('D', 'Denied!!'); }
+
+  private actOnApproval(action: string, successMessage: string): void {
+    if (this.isNew) return;
+    this.approvalBusy.set(true);
+    this.approvalService.manageAction(this.moduleCode, this.id, 'A', action, this.approvalComment()).subscribe({
+      next: () => {
+        this.approvalBusy.set(false);
+        this.confirmDialog.notify(successMessage);
+        this.loadApprovalStatus();
+      },
+      error: () => { this.approvalBusy.set(false); this.errorMessage.set('Could not record the approval action.'); }
+    });
+  }
+
+  loadApprovalHistory(): void {
+    this.approvalService.getHistory(this.moduleCode, this.id).subscribe({
+      next: tables => this.approvalHistory.set(tables ?? []),
+      error: () => this.errorMessage.set('Could not load approval history.')
+    });
+  }
+
+  updateApprovalComment(value: string): void {
+    this.approvalComment.set(value);
+  }
+
+  objectKeys(obj: any): string[] {
+    return obj ? Object.keys(obj) : [];
   }
 
   private loadSalesOrders(): void {
-    this.dailySiteService.getSalesOrders().subscribe({
+    const docDate = this.form.get('docDate')?.value || undefined;
+    this.dailySiteService.getSalesOrders(docDate).subscribe({
       next: orders => this.salesOrders.set(orders ?? []),
       error: () => this.errorMessage.set('Could not load sales orders. Check the API connection.')
     });
@@ -189,7 +321,37 @@ export class DailySiteDetailComponent implements OnInit {
     if (order && jobCode) {
       this.form.get('jobNo')?.disable({ emitEvent: false });
       this.loadSalesOrderDetails(jobCode);
+      this.checkExistingForJobAndDate();
     }
+  }
+
+  // New (no desktop equivalent) - warns if this exact Sales Order + Date combination already
+  // has a Daily Site record, before the user fills in the whole form only to hit a duplicate.
+  // Fires on Sales Order selection and again on Date change, since either can complete the pair.
+  // On a match, the Sales Order selection is cleared so the user can't proceed with the duplicate
+  // and has to pick a different Sales Order (or change the Date).
+  private checkExistingForJobAndDate(): void {
+    const jobCode = this.toNumber(this.form.get('jobCode')?.value);
+    const docDate = this.toOptionalIsoDate(this.form.get('docDate')?.value);
+    if (!jobCode || !docDate) return;
+
+    this.dailySiteService.checkExisting(jobCode, docDate, this.id).subscribe({
+      next: res => {
+        if (res?.exists) {
+          this.confirmDialog.notify(`Already exists for this date - Sales Order already saved in Daily Site '${res.docNo}'. Please choose a different Sales Order.`);
+          this.form.patchValue({ jobCode: null, jobNo: '', customer: '' });
+          this.form.get('jobNo')?.enable({ emitEvent: false });
+          this.scopeOfWork.clear();
+          this.expandedScopeGroups.clear();
+          this.material.clear();
+          this.employeeHours.clear();
+          this.consumables.clear();
+          this.machineries.clear();
+          this.branchHours.clear();
+        }
+      },
+      error: () => { /* non-critical check - stay silent on failure */ }
+    });
   }
 
   onSalesOrderTextChanged(value: string): void {
@@ -247,12 +409,42 @@ export class DailySiteDetailComponent implements OnInit {
         this.resolveLookupNames();
         this.calculateDailySite();
         this.loadExistingSalesOrders(jobCode);
+        this.loadAttendanceEmployees(jobCode);
         this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
         this.errorMessage.set('Could not load Sales Order details.');
       }
+    });
+  }
+
+  // Auto-adds a row for every employee who has a Check In recorded (Labour Attendance / face
+  // recognition) against this exact Job and date - on top of whatever the SO's own default
+  // employee template already added above. Only the employee is pulled in this way - Hrs is
+  // never auto-filled from attendance, it stays a plain manually-typed field like every other
+  // row (see applyEmployeeHourContext).
+  private loadAttendanceEmployees(jobCode: number): void {
+    const docDate = this.toOptionalIsoDate(this.form.get('docDate')?.value);
+    if (!jobCode || !docDate) return;
+
+    this.dailySiteService.getAttendanceEmployeesForJob(jobCode, docDate).subscribe({
+      next: rows => {
+        for (const row of rows ?? []) {
+          const employeeCode = this.toNumber(this.read(row, 'EmployeeCode'));
+          if (!employeeCode) continue;
+
+          let index = this.employeeHours.controls.findIndex(c =>
+            this.toNumber(c.get('employeeCode')?.value) === employeeCode);
+
+          if (index === -1) {
+            this.addEmployeeHourRow({ EmployeeCode: employeeCode, EmpFullName: this.read(row, 'EmpFullName') });
+            index = this.employeeHours.length - 1;
+          }
+          this.recalculateEmployeeRow(index);
+        }
+      },
+      error: () => { /* attendance data is a convenience auto-fill - stay silent if unavailable */ }
     });
   }
 
@@ -451,6 +643,7 @@ export class DailySiteDetailComponent implements OnInit {
           location: this.read(hdr, 'Location'),
           project: this.read(hdr, 'Project'),
           startTime: this.toTimeInputValue(this.read(hdr, 'StartTime')),
+          closeTime: this.toTimeInputValue(this.read(hdr, 'CloseTime')),
           basicHrs: this.read(hdr, 'MinHrs'),
           supervisor: this.read(hdr, 'Supervisor'),
           supervisorName: '',
@@ -482,6 +675,7 @@ export class DailySiteDetailComponent implements OnInit {
         this.responseArray(res, 'BranchHrs', 'branchHrs').forEach((r: any) => this.addBranchHourRow(r));
         this.resolveLookupNames();
 
+        if (this.approvalEnabled()) this.loadApprovalStatus();
         this.loading.set(false);
       },
       error: () => { this.errorMessage.set('Could not load record.'); this.loading.set(false); }
@@ -566,7 +760,13 @@ export class DailySiteDetailComponent implements OnInit {
       achievedRate: [{ value: this.read(data, 'AchievedRate') ?? 0, disabled: true }],
       achievedRateForEachActivity: [{ value: this.round2(this.toNumber(this.read(data, 'AchievedRateForEachActivity'))), disabled: true }],
       totalAreaCompleted: [{ value: this.read(data, 'TotalAreaCompleted') ?? 0, disabled: true }],
-      balanceToComplete: [{ value: this.read(data, 'BalanceToComplete') ?? 0, disabled: true }]
+      balanceToComplete: [{ value: this.read(data, 'BalanceToComplete') ?? 0, disabled: true }],
+      remarks: [this.read(data, 'Remarks') ?? ''],
+      // Not shown/edited in this grid (matches desktop) - just round-tripped through unchanged so
+      // a row's link back to its originating Estimation line survives every subsequent save,
+      // whether the row was just populated from a Sales Order or loaded from an existing record.
+      estimationCode: [this.read(data, 'EstimationCode') ?? 0],
+      estSlNo: [this.read(data, 'EstSlNo') ?? 0]
     }));
   }
   removeScopeRow(slNo: unknown): void { this.removeRowBySlNo(this.scopeOfWork, slNo); }
@@ -627,7 +827,9 @@ export class DailySiteDetailComponent implements OnInit {
       materialReceivedTodayAtSite: [this.read(data, 'MaterialReceivedTodayAtSite') ?? 0],
       todayConsumed: [this.read(data, 'TodayConsumed') ?? 0],
       balanceAtSite: [{ value: this.read(data, 'BalanceAtSite') ?? 0, disabled: true }],
-      area: [this.read(data, 'Area') ?? 0],
+      // Sourced from usp_GetDailySiteMaterialPrevTotalUsed's cumulative Scope of Work Area
+      // Completed for this material's Surface Preparation Code - no longer hand-typed.
+      area: [{ value: this.read(data, 'Area') ?? 0, disabled: true }],
       rateOfApplication: [{ value: this.read(data, 'RateOfApplication') ?? 0, disabled: true }],
       areaSupposedToCover: [{ value: this.read(data, 'AreaSupposedToCover') ?? 0, disabled: true }],
       todayMaterialsUsed: [{ value: this.read(data, 'TodayMaterialsUsed') ?? 0, disabled: true }],
@@ -646,12 +848,25 @@ export class DailySiteDetailComponent implements OnInit {
   removeMaterialRow(slNo: unknown): void { this.removeRowBySlNo(this.material, slNo); }
 
   // Web equivalent of gvMaterial_CellEditEnded in DailySite.xaml.cs.
-  // Balance at Site/rate/coverage come straight from this row's own ReceivedQty/TodayConsumed values.
-  // Today Materials Used adds in the running total from prior daily sites via the lightweight
-  // usp_GetDailySiteMaterialPrevTotalUsed (plain sum of TodayConsumed, excluding this DailySiteCode,
-  // with the same BaseUnitCode/PackSize divide rule applied per historical row) - not the old, much
-  // heavier usp_GetDailySiteSOWisePreviousMaterialDtl (still available via getMaterialPreviousDetail,
-  // just no longer called here).
+  // Balance at Site comes straight from this row's own ReceivedQty/TodayConsumed values. Today
+  // Materials Used, Area/No/Mtr, and Rate of Application all come from the lightweight
+  // usp_GetDailySiteMaterialPrevTotalUsed: TotalUsed is the running sum of TodayConsumed across
+  // every other DailySiteCode on this material (with the same BaseUnitCode/PackSize divide rule
+  // applied per historical row), and Area is the cumulative Scope of Work Area Completed for the
+  // Surface Preparation Code this material belongs to - not hand-typed any more. The old, much
+  // heavier usp_GetDailySiteSOWisePreviousMaterialDtl is still available via getMaterialPreviousDetail,
+  // just no longer called here.
+  // Sum of this daily site's own (not-yet-saved) Scope of Work Area Completed for a Surface
+  // Preparation Code - the SP's Area figure only covers OTHER daily sites, so this row's own
+  // scope entries have to be added in the same way consumedContribution adds today's own
+  // Today Consumed on top of the SP's historical TotalUsed.
+  private currentScopeAreaFor(surfacePreparationCode: number): number {
+    if (!surfacePreparationCode) return 0;
+    return this.scopeOfWork.controls
+      .filter(r => this.toNumber(r.get('surfacePreparationCode')?.value) === surfacePreparationCode)
+      .reduce((sum, r) => sum + this.toNumber(r.get('areaCompleted')?.value), 0);
+  }
+
   recalculateMaterialRow(index: number): void {
     if (index < 0) return;
     const row = this.material.at(index);
@@ -673,23 +888,20 @@ export class DailySiteDetailComponent implements OnInit {
     // ReceivedQty * PackSize (that would compare packs against a KG-scale number and never trip).
     const receivedLimit = receivedQty;
 
-    const area = this.toNumber(row.get('area')?.value);
     const consumedContribution = this.packSizeDivideUnitCodes.includes(baseUnitCode)
       ? (todayConsumed !== 0 ? this.round2(todayConsumed / packSize) : 0)
       : todayConsumed;
-    const rateOfApplication = (area !== 0 && todayConsumed !== 0) ? this.round2(area / todayConsumed) : 0;
     const areaSupposedToCover = todayConsumed !== 0 ? Math.round(todayConsumed) : 0;
 
-    row.patchValue({
-      rateOfApplication,
-      areaSupposedToCover
-    }, { emitEvent: false });
+    row.patchValue({ areaSupposedToCover }, { emitEvent: false });
 
     const materialCode = this.toNumber(row.get('materialCode')?.value);
     const jobCode = this.toNumber(this.form.get('jobCode')?.value);
     this.dailySiteService.getMaterialPrevTotalUsed(jobCode, this.id, materialCode).subscribe({
       next: res => {
         const totalUsedPrev = this.toNumber(res?.totalUsed);
+        const surfacePreparationCode = this.toNumber(res?.surfacePreparationCode);
+        const area = this.round2(this.currentScopeAreaFor(surfacePreparationCode) + this.toNumber(res?.area));
         const todayMaterialsUsed = this.round2(consumedContribution + totalUsedPrev);
 
         // The Received Qty check has to include the SP's running total from prior daily sites,
@@ -713,6 +925,8 @@ export class DailySiteDetailComponent implements OnInit {
           const revertedBalanceAtSite = this.round2(receivedQty - revertedTodayMaterialsUsed);
           const totalMaterialEstimatedQtyReverted = this.toNumber(row.get('totalMaterialEstimatedQty')?.value);
           const revertedBalanceMaterials = this.round2(totalMaterialEstimatedQtyReverted - revertedTodayMaterialsUsed);
+          const revertedRateOfApplication = (area !== 0 && revertedTodayMaterialsUsed !== 0)
+            ? this.round2(area / revertedTodayMaterialsUsed) : 0;
 
           this.confirmDialog.notify('Total Consumed Must Be Less Than or Equal To Received Qty').then(() => {
             row.patchValue({
@@ -720,7 +934,9 @@ export class DailySiteDetailComponent implements OnInit {
               baseUnitCode: previousValid.baseUnitCode,
               todayMaterialsUsed: revertedTodayMaterialsUsed,
               balanceAtSite: revertedBalanceAtSite,
-              balanceMaterials: revertedBalanceMaterials
+              balanceMaterials: revertedBalanceMaterials,
+              area,
+              rateOfApplication: revertedRateOfApplication
             }, { emitEvent: false });
           });
           return;
@@ -730,10 +946,13 @@ export class DailySiteDetailComponent implements OnInit {
         const balanceAtSite = this.round2(receivedQty - todayMaterialsUsed);
         const totalMaterialEstimatedQty = this.toNumber(row.get('totalMaterialEstimatedQty')?.value);
         const balanceMaterials = this.round2(totalMaterialEstimatedQty - todayMaterialsUsed);
+        const rateOfApplication = (area !== 0 && todayMaterialsUsed !== 0) ? this.round2(area / todayMaterialsUsed) : 0;
         row.patchValue({
           todayMaterialsUsed,
           balanceAtSite,
-          balanceMaterials
+          balanceMaterials,
+          area,
+          rateOfApplication
         }, { emitEvent: false });
       },
       error: () => this.errorMessage.set('Could not verify material usage.')
@@ -754,7 +973,14 @@ export class DailySiteDetailComponent implements OnInit {
       ot2: [{ value: this.read(data, 'OT2') ?? 0, disabled: true }],
       totalHrs: [{ value: this.read(data, 'TotalHrs') ?? 0, disabled: true }],
       idle: [{ value: this.read(data, 'Idle') ?? 0, disabled: true }],
-      transport: [this.read(data, 'Transport') ?? 0]
+      transport: [this.read(data, 'Transport') ?? 0],
+      // Reference-only - the Check In/Check Out span from Labour Attendance for this
+      // employee/job/date, when it exists. Saved alongside the row (computed and persisted
+      // server-side at save time, see DailySiteService.GetAttendanceHrsMap - the value here is
+      // just what's displayed) but never feeds Hrs/Idle/OT/Total, purely something to look at.
+      // Loaded from the saved record on reopen; refreshed live from recalculateEmployeeRow
+      // (employee picked or Hrs edited) before that.
+      attendanceHrs: [{ value: this.read(data, 'AttendanceHrs') ?? null, disabled: true }]
     }));
   }
   removeEmployeeHourRow(slNo: unknown): void { this.removeRowBySlNo(this.employeeHours, slNo); }
@@ -781,9 +1007,10 @@ export class DailySiteDetailComponent implements OnInit {
     const row = this.employeeHours.at(index);
     const employeeCode = this.toNumber(row.get('employeeCode')?.value);
     const docDate = this.toOptionalIsoDate(this.form.get('docDate')?.value) ?? '1900-01-01';
+    const jobCode = this.toNumber(this.form.get('jobCode')?.value);
 
     this.dailySiteService
-      .getEmployeeHourContext(employeeCode, docDate, this.id, this.settings.branchCode(), this.settings.periodId())
+      .getEmployeeHourContext(employeeCode, docDate, this.id, this.settings.branchCode(), this.settings.periodId(), jobCode)
       .subscribe({
         next: ctx => this.applyEmployeeHourContext(index, ctx),
         error: () => this.errorMessage.set('Could not verify employee hours.')
@@ -792,6 +1019,13 @@ export class DailySiteDetailComponent implements OnInit {
 
   private applyEmployeeHourContext(index: number, ctx: any): void {
     const row = this.employeeHours.at(index);
+
+    // Display only - see the attendanceHrs control's comment in addEmployeeHourRow. Never
+    // touches Hrs or any part of the calculation below.
+    if (ctx.attendanceHrs != null) {
+      row.patchValue({ attendanceHrs: ctx.attendanceHrs }, { emitEvent: false });
+    }
+
     const actualHours = this.toNumber(row.get('hrs')?.value);
 
     if (ctx.branchCode) row.patchValue({ branchCode: ctx.branchCode }, { emitEvent: false });
@@ -931,6 +1165,9 @@ export class DailySiteDetailComponent implements OnInit {
   // ---------- Consumables rows ----------
   addConsumableRow(data?: any): void {
     const baseUnitCode = this.read(data, 'BaseUnitCode') ?? null;
+    // Defaults to 18 on a new row. Same divide-by-Pack-Size calculation as Material's
+    // packSizeDivideUnitCodes rule - see recalculateConsumableRow.
+    const packSize = this.read(data, 'PackSize') ?? 18;
     // A row loaded from saved/estimation data carries its own Direct flag; a brand-new row
     // added via "+Add Row" is always Direct (manually entered, not derived from the job's
     // estimation). Quantity always stays read-only - Estimation-wise rows get it from the
@@ -939,30 +1176,51 @@ export class DailySiteDetailComponent implements OnInit {
     this.consumables.push(this.fb.group({
       slNo: [this.read(data, 'SlNo') ?? this.nextSlNo(this.consumables)],
       consumableCode: [this.read(data, 'ConsumableCode') ?? null],
-      consumableName: [this.read(data, 'Description') ?? ''],
+      // Consumable description is always read-only - unlike Material, there's no "+ Add Row"
+      // on this tab, so every row (Estimation-wise or Direct) is pre-populated and never
+      // hand-picked here.
+      consumableName: [{ value: this.read(data, 'Description') ?? '', disabled: true }],
       quantity: [{ value: this.read(data, 'Quantity') ?? 0, disabled: true }],
       usedToday: [this.read(data, 'UsedToday') ?? 0],
       totalConsumablesUsed: [{ value: this.read(data, 'TotalConsumablesUsed') ?? 0, disabled: true }],
       bgColor: [this.read(data, 'BgColour', 'BgColor') ?? ''],
       baseUnitCode: [baseUnitCode],
       baseUnitName: [this.resolveUnitName(baseUnitCode)],
+      packSize: [packSize],
       direct: [isDirect ? 1 : 0]
     }));
   }
   removeConsumableRow(slNo: unknown): void { this.removeRowBySlNo(this.consumables, slNo); }
 
-  // Web equivalent of gvConsumbales_CellEditEnded in DailySite.xaml.cs (only the "Used Today" edit recalculates).
+  // Web equivalent of gvConsumbales_CellEditEnded in DailySite.xaml.cs (Used Today, Base Unit,
+  // and Pack Size edits all recalculate) - same divide-by-Pack-Size rule as Material's
+  // packSizeDivideUnitCodes in recalculateMaterialRow.
   recalculateConsumableRow(index: number): void {
     if (index < 0) return;
     const row = this.consumables.at(index);
     const consumableCode = this.toNumber(row.get('consumableCode')?.value);
     const usedToday = this.toNumber(row.get('usedToday')?.value);
+    const packSize = this.toNumber(row.get('packSize')?.value);
+    const baseUnitCode = this.toNumber(row.get('baseUnitCode')?.value);
+
+    if (this.packSizeDivideUnitCodes.includes(baseUnitCode) && packSize === 0) {
+      this.confirmDialog.notify('Pack Size is 0 for this consumable - cannot use this Base Unit.').then(() => {
+        row.patchValue({ baseUnitCode: '' }, { emitEvent: false });
+        this.recalculateConsumableRow(index);
+      });
+      return;
+    }
+
+    const usedTodayContribution = this.packSizeDivideUnitCodes.includes(baseUnitCode)
+      ? (usedToday !== 0 ? this.round2(usedToday / packSize) : 0)
+      : usedToday;
+
     const jobCode = this.toNumber(this.form.get('jobCode')?.value);
 
     this.dailySiteService.getConsumablePreviousDetail(jobCode, this.id, consumableCode).subscribe({
       next: ctx => {
         const totalConsumablesUsedPrev = this.toNumber(ctx?.totalConsumablesUsedPrev);
-        row.patchValue({ totalConsumablesUsed: usedToday + totalConsumablesUsedPrev }, { emitEvent: false });
+        row.patchValue({ totalConsumablesUsed: usedTodayContribution + totalConsumablesUsedPrev }, { emitEvent: false });
       },
       error: () => this.errorMessage.set('Could not verify consumable usage.')
     });
@@ -985,6 +1243,13 @@ export class DailySiteDetailComponent implements OnInit {
     }));
   }
   removeMachineryRow(slNo: unknown): void { this.removeRowBySlNo(this.machineries, slNo); }
+
+  onMachineryStatusChanged(index: number): void {
+    const row = this.machineries.at(index);
+    const code = this.toNumber(row.get('statusCode')?.value);
+    const item = this.machineryStatuses().find(i => this.toNumber(this.read(i, 'StatusCode')) === code);
+    row.patchValue({ statusName: item ? this.read(item, 'StatusName') ?? '' : '' }, { emitEvent: false });
+  }
 
   // Web equivalent of gvMachineries_CellEditEnded in DailySite.xaml.cs: available at site can never
   // exceed the estimated quantity - clamps back down and warns, same as the desktop's revert-to-OldData.
@@ -1015,6 +1280,14 @@ export class DailySiteDetailComponent implements OnInit {
   }
 
   save(): void {
+    if (!this.rights().add) {
+      this.errorMessage.set('You do not have permission to add.');
+      return;
+    }
+    if (this.isEditLocked) {
+      this.errorMessage.set('This record is more than 24 hours old and can no longer be updated.');
+      return;
+    }
     if (this.form.get('docDate')?.invalid || this.form.get('jobNo')?.invalid || this.form.get('customer')?.invalid) {
       this.form.markAllAsTouched();
       this.activeTab.set('basic');
@@ -1042,7 +1315,7 @@ export class DailySiteDetailComponent implements OnInit {
       startDate: this.toOptionalIsoDate(v.startDate),
       finishDate: this.toOptionalIsoDate(v.finishDate),
       startTime: this.toOptionalIsoDateTime(v.docDate, v.startTime),
-      closeTime: null,
+      closeTime: this.toOptionalIsoDateTime(v.docDate, v.closeTime),
       minHrs: this.toText(v.basicHrs),
       supervisor: this.toNumber(v.supervisor),
       engineer: this.toNumber(v.engineer),
@@ -1062,7 +1335,10 @@ export class DailySiteDetailComponent implements OnInit {
         totalAreaCompleted: this.toNumber(row.totalAreaCompleted),
         balanceToComplete: this.toNumber(row.balanceToComplete),
         scope: this.toText(row.scope),
-        division: this.toNumber(v.division)
+        division: this.toNumber(v.division),
+        remarks: this.toText(row.remarks),
+        estimationCode: this.toNumber(row.estimationCode),
+        estSlNo: this.toNumber(row.estSlNo)
       })),
       material: this.material.getRawValue().map((row: any) => ({
         slNo: this.toNumber(row.slNo),
@@ -1097,7 +1373,8 @@ export class DailySiteDetailComponent implements OnInit {
           usedToday: this.toNumber(row.usedToday),
           totalConsumablesUsed: this.toNumber(row.totalConsumablesUsed),
           bgColor: this.toText(row.bgColor),
-          baseUnitCode: this.toNumber(row.baseUnitCode) || null
+          baseUnitCode: this.toNumber(row.baseUnitCode) || null,
+          packSize: this.toNumber(row.packSize)
         })),
       consumablesDR: this.consumables.getRawValue()
         .filter((row: any) => this.toNumber(row.direct) === 1)
@@ -1108,7 +1385,8 @@ export class DailySiteDetailComponent implements OnInit {
           usedToday: this.toNumber(row.usedToday),
           totalConsumablesUsed: this.toNumber(row.totalConsumablesUsed),
           bgColor: this.toText(row.bgColor),
-          baseUnitCode: this.toNumber(row.baseUnitCode) || null
+          baseUnitCode: this.toNumber(row.baseUnitCode) || null,
+          packSize: this.toNumber(row.packSize)
         })),
       machineries: this.machineries.getRawValue().map((row: any) => ({
         slNo: this.toNumber(row.slNo),

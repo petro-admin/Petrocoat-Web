@@ -1,0 +1,63 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Ledger @if (currencySymbol()) { <span class="currency-badge">{{ currencySymbol() }}</span> }</h2>
+    <div class="filters">
+      <label>Account Head(s)
+        <app-multi-select [options]="headOptions()" placeholder="Select Account Head(s)"
+               [ngModel]="accountHeadCodes()" (ngModelChange)="accountHeadCodes.set($event)"></app-multi-select>
+      </label>
+      <label>From <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" /></label>
+      <label>To <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" /></label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="back()">Back</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @for (block of ledgerBlocks(); track block.accountHeadCode) {
+    <div class="ledger-block">
+      <h3 class="ledger-heading">{{ block.headName }}</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Voucher No</th><th>Type</th><th>Narration</th><th>Debit</th><th>Credit</th><th>Balance</th></tr>
+          </thead>
+          <tbody>
+            <tr class="opening-row">
+              <td colspan="6" class="total-label">Opening Balance</td>
+              <td class="balance-cell">{{ currencySymbol() }} {{ block.openingBalance }} {{ drCr(block.openingBalance) }}</td>
+            </tr>
+            @for (item of block.rowsWithBalance; track $index) {
+              <tr>
+                <td>{{ read(item.row, 'VoucherDate') | date:'dd-MM-yyyy' }}</td>
+                <td>{{ read(item.row, 'VoucherNo') }}</td>
+                <td>{{ read(item.row, 'VoucherType') }}</td>
+                <td>{{ read(item.row, 'Narration') || '-' }}</td>
+                <td>{{ read(item.row, 'DebitAmount') || '-' }}</td>
+                <td>{{ read(item.row, 'CreditAmount') || '-' }}</td>
+                <td class="balance-cell">{{ currencySymbol() }} {{ item.balance }} {{ drCr(item.balance) }}</td>
+              </tr>
+            }
+            @if (block.rowsWithBalance.length === 0 && !loading()) {
+              <tr><td colspan="7" class="empty">No transactions in this period</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr><td colspan="6" class="total-label">Closing Balance</td><td class="balance-cell total-value">{{ currencySymbol() }} {{ block.closingBalance }} {{ drCr(block.closingBalance) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  }
+  @if (ledgerBlocks().length === 0 && !loading() && !errorMessage()) {
+    <p class="hint">Select one or more Account Heads and click Load.</p>
+  }
+  }
+</div>

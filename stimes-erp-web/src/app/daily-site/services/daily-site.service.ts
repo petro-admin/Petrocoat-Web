@@ -21,8 +21,14 @@ export class DailySiteService {
     return this.http.get<{ docNo: string }>(`${this.base}/generate-docno`, { params: { docDate } });
   }
 
-  getSalesOrders(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.base}/sales-orders`);
+  getSalesOrders(docDate?: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/sales-orders`, docDate ? { params: { docDate } } : {});
+  }
+
+  checkExisting(jobCode: number, docDate: string, excludeCode: number): Observable<{ exists: boolean; code: number; docNo: string }> {
+    return this.http.get<{ exists: boolean; code: number; docNo: string }>(`${this.base}/check-existing`, {
+      params: { jobCode, docDate, excludeCode }
+    });
   }
 
   getSalesOrderDetails(soCode: number, basic: number, dailySiteCode: number, itemCode: number, docDate: string): Observable<any[][]> {
@@ -39,10 +45,14 @@ export class DailySiteService {
     return this.http.get<any>(`${this.base}/lookups`);
   }
 
-  getEmployeeHourContext(employeeCode: number, docDate: string, dailySiteCode: number, branchCode: number, periodId: number): Observable<any> {
+  getEmployeeHourContext(employeeCode: number, docDate: string, dailySiteCode: number, branchCode: number, periodId: number, jobCode: number = 0): Observable<any> {
     return this.http.get<any>(`${this.base}/employee-hour-context`, {
-      params: { employeeCode, docDate, dailySiteCode, branchCode, periodId }
+      params: { employeeCode, docDate, dailySiteCode, branchCode, periodId, jobCode }
     });
+  }
+
+  getAttendanceEmployeesForJob(jobCode: number, docDate: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.base}/attendance-employees`, { params: { jobCode, docDate } });
   }
 
   getScopeOfWorkContext(jobCode: number, surfacePreparationCode: number, dailySiteCode: number, scopeOfWorkAsPerJobCard: number, slNo: number, specialRequirement: string): Observable<any> {
@@ -57,8 +67,8 @@ export class DailySiteService {
     });
   }
 
-  getMaterialPrevTotalUsed(jobCode: number, dailySiteCode: number, materialCode: number): Observable<{ totalUsed: number }> {
-    return this.http.get<{ totalUsed: number }>(`${this.base}/material-prev-total-used`, {
+  getMaterialPrevTotalUsed(jobCode: number, dailySiteCode: number, materialCode: number): Observable<{ totalUsed: number; area: number; rateOfApplication: number; surfacePreparationCode: number }> {
+    return this.http.get<{ totalUsed: number; area: number; rateOfApplication: number; surfacePreparationCode: number }>(`${this.base}/material-prev-total-used`, {
       params: { jobCode, dailySiteCode, materialCode }
     });
   }

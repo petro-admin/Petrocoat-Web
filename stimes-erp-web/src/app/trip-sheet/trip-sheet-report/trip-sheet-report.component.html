@@ -1,0 +1,95 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Trip Sheet Report</h2>
+    <div class="filters">
+      <label>From <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" /></label>
+      <label>To <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" /></label>
+      <button type="button" (click)="load()">Load</button>
+      <button type="button" class="primary" (click)="downloadExcel()">Download Excel</button>
+      <button type="button" (click)="print()">Print</button>
+      <button type="button" (click)="back()">Back</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <p class="print-only date-range">{{ fromDate() | date:'dd-MM-yyyy' }} to {{ toDate() | date:'dd-MM-yyyy' }}</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Sl No</th><th>Vehicle No</th><th>KM</th><th>Fuel Consumption</th><th>Driver</th>
+          <th>Route Start Time</th><th>First Site No</th><th>First Site Reach Time</th>
+          <th>Last Site No</th><th>Last Site Start Time</th><th>Camp Reach Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.dateKey) {
+          <tr class="day-row"><td colspan="11">{{ group.dayLabel }}</td></tr>
+          @for (row of group.rows; track $index) {
+            <tr>
+              <td>{{ read(row, 'SlNo') }}</td>
+              <td>{{ read(row, 'RegistrationNo') }}</td>
+              <td>{{ read(row, 'Km') }}</td>
+              <td>{{ read(row, 'FuelConsumption') }}</td>
+              <td>{{ read(row, 'DriverName') }}</td>
+              <td>{{ formatTime(read(row, 'RouteStartTime')) }}</td>
+              <td>{{ read(row, 'FirstSiteNo') }}</td>
+              <td>{{ formatTime(read(row, 'FirstSiteReachTime')) }}</td>
+              <td>{{ read(row, 'LastSiteNo') }}</td>
+              <td>{{ formatTime(read(row, 'LastSiteStartTime')) }}</td>
+              <td>{{ formatTime(read(row, 'CampReachTime')) }}</td>
+            </tr>
+          }
+        }
+        @if (groups().length === 0 && !loading()) {
+          <tr><td colspan="11" class="empty">No trips found in this date range</td></tr>
+        }
+      </tbody>
+      @if (groups().length > 0) {
+        <tfoot>
+          <tr><td colspan="2" class="total-label">Total</td><td class="total-value">{{ totalKm() }}</td><td colspan="8"></td></tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+
+  <!-- Print-only - matches the desktop Excel export's own simpler column set, plus Driver. -->
+  <table class="print-table">
+    <thead>
+      <tr>
+        <th>SL NO</th><th>VEHICLE NO</th><th>KM</th><th>FUEL CONSUMPTION</th><th>DRIVER</th>
+        <th>TRIP START TIME</th><th>TRIP END TIME</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (group of groups(); track group.dateKey) {
+        <tr class="day-row"><td colspan="7">{{ group.dayLabel }}</td></tr>
+        @for (row of group.rows; track $index) {
+          <tr>
+            <td>{{ read(row, 'SlNo') }}</td>
+            <td>{{ read(row, 'RegistrationNo') }}</td>
+            <td>{{ read(row, 'Km') }}</td>
+            <td>{{ read(row, 'FuelConsumption') }}</td>
+            <td>{{ read(row, 'DriverName') }}</td>
+            <td>{{ formatTime(read(row, 'RouteStartTime')) }}</td>
+            <td>{{ formatTime(read(row, 'CampReachTime')) }}</td>
+          </tr>
+        }
+      }
+    </tbody>
+    @if (groups().length > 0) {
+      <tfoot>
+        <tr><td colspan="2" class="total-label">Total</td><td class="total-value">{{ totalKm() }}</td><td colspan="4"></td></tr>
+      </tfoot>
+    }
+  </table>
+  }
+</div>

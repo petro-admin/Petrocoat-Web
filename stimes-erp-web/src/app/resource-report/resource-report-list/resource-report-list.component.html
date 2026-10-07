@@ -1,0 +1,123 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Resource Report</h2>
+  </header>
+
+  <p class="print-only date-range">{{ fromDate }} to {{ toDate }}</p>
+
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <section class="card filters-card">
+    <div class="grid-2">
+      <div class="field">
+        <label>From Date</label>
+        <app-date-input [(ngModel)]="fromDate"></app-date-input>
+      </div>
+      <div class="field">
+        <label>To Date</label>
+        <app-date-input [(ngModel)]="toDate"></app-date-input>
+      </div>
+      <div class="field">
+        <label>Sales Order No</label>
+        <app-filter-select [options]="salesOrders()" valueKey="SOCode" labelKey="SONo" placeholder="-All Sales Orders-"
+          [ngModel]="soCode" (valueChange)="soCode = $event"></app-filter-select>
+      </div>
+      <div class="field">
+        <label>Branch</label>
+        <app-multi-select [options]="settings.branches()" valueKey="BranchCode" labelKey="BranchName" placeholder="-All Branches-"
+          [(ngModel)]="branchCodes" [ngModelOptions]="{standalone: true}"></app-multi-select>
+      </div>
+    </div>
+
+    <div class="field type-row">
+      <label>Type</label>
+      <div class="checkbox-row">
+        <label class="checkbox-label"><input type="radio" name="type" [checked]="type() === 'material'" (click)="setType('material')" /> Material</label>
+        <label class="checkbox-label"><input type="radio" name="type" [checked]="type() === 'consumable'" (click)="setType('consumable')" /> Consumable</label>
+        <label class="checkbox-label"><input type="radio" name="type" [checked]="type() === 'tae'" (click)="setType('tae')" /> Tools and Equipment</label>
+        <label class="checkbox-label"><input type="radio" name="type" [checked]="type() === 'all'" (click)="setType('all')" /> All</label>
+      </div>
+    </div>
+
+    @if (type() !== 'all') {
+      <div class="field">
+        <label>Details (optional - leave blank for every item)</label>
+        <app-filter-select [options]="currentItemOptions()" valueKey="ItemCode" labelKey="Description" placeholder="-All Items-"
+          [ngModel]="itemCode" (valueChange)="itemCode = $event"></app-filter-select>
+      </div>
+    }
+
+    <div class="actions-row">
+      <button type="button" class="primary" [disabled]="loading()" (click)="search()">{{ loading() ? 'Loading...' : 'View' }}</button>
+    </div>
+  </section>
+
+  @if (searched()) {
+    <section class="card">
+      @if (!loading() && rows().length === 0) {
+        <p class="empty">No records match these filters</p>
+      } @else {
+        <div class="results-toolbar">
+          <button type="button" class="secondary" (click)="print()">Print</button>
+          <button type="button" class="secondary" [disabled]="exporting() || rows().length === 0" (click)="exportToExcel()">
+            {{ exporting() ? 'Exporting...' : 'Export to Excel' }}
+          </button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Sl</th>
+                @if (type() === 'all') { <th>Type</th> }
+                <th>Item</th>
+                <th>Unit</th>
+                <th class="num">Requested Qty</th>
+                <th class="num">Issued Qty</th>
+                <th class="num">Balance Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (group of jobGroups(); track group.key) {
+                <tr class="group-row job-group" (click)="toggle(group.key)">
+                  <td [attr.colspan]="type() === 'all' ? 7 : 6">
+                    <span class="chevron" [class.collapsed]="isCollapsed(group.key)">▾</span>
+                    {{ group.label }}
+                  </td>
+                </tr>
+                @if (!isCollapsed(group.key)) {
+                  @for (row of group.rows; track $index; let i = $index) {
+                    <tr>
+                      <td>{{ i + 1 }}</td>
+                      @if (type() === 'all') { <td>{{ rowValue(row, 'Type') }}</td> }
+                      <td>{{ rowValue(row, 'ItemName') }}</td>
+                      <td>{{ rowValue(row, 'UnitName') }}</td>
+                      <td class="num">{{ rowValue(row, 'RequestedQty') | number:'1.0-2' }}</td>
+                      <td class="num">{{ rowValue(row, 'IssuedQty') | number:'1.0-2' }}</td>
+                      <td class="num" [class.negative]="rowValue(row, 'BalanceQty') < 0">{{ rowValue(row, 'BalanceQty') | number:'1.0-2' }}</td>
+                    </tr>
+                  }
+                }
+              }
+            </tbody>
+            @if (rows().length > 0) {
+              <tfoot>
+                <tr>
+                  <td [attr.colspan]="type() === 'all' ? 4 : 3"><strong>Total</strong></td>
+                  <td class="num"><strong>{{ totals().requested | number:'1.0-2' }}</strong></td>
+                  <td class="num"><strong>{{ totals().issued | number:'1.0-2' }}</strong></td>
+                  <td class="num" [class.negative]="totals().balance < 0"><strong>{{ totals().balance | number:'1.0-2' }}</strong></td>
+                </tr>
+              </tfoot>
+            }
+          </table>
+        </div>
+      }
+    </section>
+  }
+  }
+</div>

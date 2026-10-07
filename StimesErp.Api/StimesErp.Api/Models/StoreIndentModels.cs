@@ -67,5 +67,10 @@ namespace StimesErp.Api.Models
         public decimal RequestedQty { get; set; }
         public decimal IssuedQty { get; set; }
         public string Remarks { get; set; } = string.Empty;
+
+        /// <summary>True for a row added manually via "+ Add Row"; false for a row pulled in from
+        /// the Sales Order's estimation. Drives the row's color-coding and is persisted separately
+        /// from the shared save path via usp_Purchase_SetStoreIndentDirectFlags - see StoreIndentService.</summary>
+        public bool IsDirect { get; set; }
     }
 }

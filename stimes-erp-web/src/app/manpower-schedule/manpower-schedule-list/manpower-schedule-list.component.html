@@ -1,0 +1,75 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Manpower Schedule</h2>
+    <div class="filters">
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button (click)="openNew()" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <p>Loading...</p>
+  }
+  @if (errorMessage()) {
+    <p class="error">{{ errorMessage() }}</p>
+  }
+
+  @if (!loading() && !errorMessage() && monthGroups().length === 0) {
+    <p class="empty">{{ rows().length === 0 ? 'No records for the current period' : 'No records match your filters' }}</p>
+  }
+
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Doc No</th>
+        <th>Doc Date</th>
+        <th></th>
+      </tr>
+      <tr class="filter-row">
+        <th>
+          <input type="text" placeholder="Filter..."
+                 [ngModel]="filters().docNo"
+                 (ngModelChange)="updateFilter('docNo', $event)" />
+        </th>
+        <th class="date-column">
+          <app-date-input
+                 [ngModel]="filters().docDate"
+                 (ngModelChange)="updateFilter('docDate', $event)" />
+        </th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (month of monthGroups(); track month.key) {
+        <tr class="group-row month-group" (click)="toggle(month.key)">
+          <td colspan="3">
+            <span class="chevron" [class.collapsed]="isCollapsed(month.key)">▾</span>
+            {{ month.label }}
+          </td>
+        </tr>
+
+        @if (!isCollapsed(month.key)) {
+          @for (row of month.rows; track rowValue(row, 'Code')) {
+            <tr class="data-row" (click)="open(row)">
+              <td>{{ rowValue(row, 'DocNo') }}</td>
+              <td class="date-column">{{ rowValue(row, 'DocDate') | date:'dd-MM-yyyy' }}</td>
+              <td class="actions-column">
+                @if (rights().delete) {
+                  <button type="button" class="delete-btn" (click)="deleteRow(row, $event)">Delete</button>
+                }
+              </td>
+            </tr>
+          }
+        }
+      }
+    </tbody>
+  </table>
+  </div>
+  }
+</div>

@@ -1,0 +1,128 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <span class="toolbar-hint">"Download PDF" opens the print dialog — choose "Save as PDF" as the destination</span>
+    <button type="button" (click)="print()">Download PDF</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    <h1 class="report-title">RESOURCE RETURN</h1>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">Return No :</td><td>{{ rowValue(header(), 'MatReturnNo') }}</td>
+        <td class="label">Return Date :</td><td>{{ rowValue(header(), 'MatReturnDate') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Resource Issue No :</td><td colspan="3">{{ rowValue(header(), 'issueno') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Issued To :</td><td>{{ rowValue(header(), 'issuedby') }}</td>
+        <td class="label">Cost Center :</td><td>{{ rowValue(header(), 'CostName') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Project Details :</td><td colspan="3">{{ rowValue(header(), 'ProjectDetails') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Status :</td><td colspan="3">{{ approvalStatusText() }}</td>
+      </tr>
+    </table>
+
+    @if (materials().length > 0) {
+      <h2 class="section-title">Materials</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Item</th><th>Return Qty</th><th>Unit</th></tr></thead>
+          <tbody>
+            @for (row of materials(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'ItemName') }}</td><td>{{ rowValue(row, 'ReturnQty') }}</td><td>{{ rowValue(row, 'UnitCode') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (consumables().length > 0) {
+      <h2 class="section-title">Consumable</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Consumable</th><th>Return Qty</th><th>Unit</th></tr></thead>
+          <tbody>
+            @for (row of consumables(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'ConsumableName') }}</td><td>{{ rowValue(row, 'ReturnedQty') }}</td><td>{{ rowValue(row, 'UnitCode') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (toolsAndEquipment().length > 0) {
+      <h2 class="section-title">Tools &amp; Equipment</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Description</th><th>Return Qty</th><th>Condition</th></tr></thead>
+          <tbody>
+            @for (row of toolsAndEquipment(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'Description') }}</td><td>{{ rowValue(row, 'ReturnedQty') }}</td><td>{{ rowValue(row, 'ConditionOfMachine') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (toolsAndEquipmentHire().length > 0) {
+      <h2 class="section-title">Tools &amp; Equipment (Hire)</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Description</th><th>Return Qty</th></tr></thead>
+          <tbody>
+            @for (row of toolsAndEquipmentHire(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'Description') }}</td><td>{{ rowValue(row, 'ReturnedQty') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (generalServices().length > 0) {
+      <h2 class="section-title">General Services</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Item</th><th>Return Qty</th><th>Remarks</th></tr></thead>
+          <tbody>
+            @for (row of generalServices(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'ItemName') }}</td><td>{{ rowValue(row, 'ReturnedQty') }}</td><td class="text-left">{{ rowValue(row, 'Remarks') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (subContract().length > 0) {
+      <h2 class="section-title">Subcontract</h2>
+      <div class="table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Sl</th><th>Item</th><th>Return Qty</th><th>Remarks</th></tr></thead>
+          <tbody>
+            @for (row of subContract(); track $index) {
+              <tr><td>{{ rowValue(row, 'SlNo') }}</td><td class="text-left">{{ rowValue(row, 'ItemName') }}</td><td>{{ rowValue(row, 'ReturnedQty') }}</td><td class="text-left">{{ rowValue(row, 'Remarks') }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">Returned By</div>
+        <div class="signature-line">&nbsp;</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">Approved By</div>
+        <div class="signature-line">{{ approvedByName() }}</div>
+      </div>
+    </div>
+  }
+</div>

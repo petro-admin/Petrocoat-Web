@@ -1,0 +1,61 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Master</div>
+      <h2>Account Head Master</h2>
+    </div>
+    <div class="filters">
+      <input type="text" placeholder="Search Account Head / Group" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Account Head</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Account Head</th><th>Opening Balance</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.key) {
+          <tr class="group-row" (click)="toggle(group.key)">
+            <td colspan="4">
+              <span class="chevron" [class.collapsed]="isCollapsed(group.key)">▾</span>
+              {{ group.label }}
+            </td>
+          </tr>
+          @if (!isCollapsed(group.key)) {
+            @for (row of group.rows; track read(row, 'Code')) {
+              <tr class="data-row" (click)="open(row)">
+                <td>{{ read(row, 'HeadName') }}</td>
+                <td>{{ read(row, 'OpeningBalance') }} {{ read(row, 'OpeningBalanceType') }}</td>
+                <td>
+                  <span class="status-badge" [class.inactive]="!read(row, 'IsActive')">{{ read(row, 'IsActive') ? 'Active' : 'Inactive' }}</span>
+                </td>
+                <td class="actions-cell">
+                  @if (rights().delete) {
+                    <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+                  }
+                </td>
+              </tr>
+            }
+          }
+        }
+        @if (groups().length === 0 && !loading()) {
+          <tr><td colspan="4" class="empty">No Account Heads found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

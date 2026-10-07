@@ -18,11 +18,15 @@ namespace StimesErp.Api.Controllers
 
         private readonly StoreIndentService _service;
         private readonly ApprovalService _approval;
+        private readonly SettingsService _settings;
+        private readonly NotificationService _notification;
 
-        public StoreIndentController(StoreIndentService service, ApprovalService approval)
+        public StoreIndentController(StoreIndentService service, ApprovalService approval, SettingsService settings, NotificationService notification)
         {
             _service = service;
             _approval = approval;
+            _settings = settings;
+            _notification = notification;
         }
 
         private int CurrentUserCode =>
@@ -95,9 +99,9 @@ namespace StimesErp.Api.Controllers
 
         // General grid: Type-driven item list (Material/Consumable/Tools & Equipment).
         [HttpGet("item-lookup")]
-        public IActionResult GetItemLookup([FromQuery] int typeCode)
+        public IActionResult GetItemLookup([FromQuery] int typeCode, [FromQuery] int branchCode = 0)
         {
-            return Ok(_service.GetGeneralItemLookup(typeCode).ToJsonRows());
+            return Ok(_service.GetGeneralItemLookup(typeCode, branchCode).ToJsonRows());
         }
 
         // General grid: Status = Exist -> resolve UnitCode/StockQty for the picked item.
@@ -137,14 +141,37 @@ namespace StimesErp.Api.Controllers
         public IActionResult Save([FromBody] StoreIndentSaveRequest request,
             [FromQuery] int companyCode, [FromQuery] int branchCode, [FromQuery] int periodId)
         {
+            // Matches desktop's CheckRequisitionDateIsInFinancialPeriod()/CheckDateIsInFinancialPeriod()
+            // gate in SaveButton_Click/SavePRequisition - nothing stopped a save dated outside the open
+            // financial period before this.
+            if (!_settings.IsDateInFinancialPeriod(periodId, request.RequisitionDate))
+                return BadRequest(new { message = "The required date should be in financial Period." });
+
+            var wasCreate = request.PReqnCode == 0;
             var result = _service.Save(request, companyCode, branchCode, periodId, CurrentUserCode, ResolveModuleCode());
+            _service.SetDirectFlags(request.RequisitionNo, request.Material, request.Consumable, request.TAE);
+
+            // Create and Update both raise here - whichever ones a given form's Notification
+            // Settings actually has checked decides who (if anyone) gets notified; NotificationService
+            // silently no-ops if nothing is configured for this event, so it's safe to always call.
+            _notification.Raise(FormClassName, wasCreate ? "CREATE" : "UPDATE", request.RequisitionNo,
+                $"Store Indent {request.RequisitionNo} was {(wasCreate ? "created" : "updated")}", CurrentUserCode);
+
             return Ok(new { result });
         }
 
         [HttpDelete("{id:int}")]
         public IActionResult Delete(int id)
         {
+            // Looked up before the delete happens, since the record (and its RequisitionNo) is gone
+            // once usp_purchase_DeleteStoreIndent runs - BranchCode=0 matches regardless of branch.
+            var hdr = _service.GetHeader(id, 0);
+            var requisitionNo = hdr.Rows.Count > 0 ? hdr.Rows[0]["PurReqnNo"]?.ToString() : null;
+
             var result = _service.Delete(id, ResolveModuleCode(), CurrentUserCode);
+            _notification.Raise(FormClassName, "DELETE", requisitionNo,
+                $"Store Indent {requisitionNo} was deleted", CurrentUserCode);
+
             return Ok(new { result });
         }
     }

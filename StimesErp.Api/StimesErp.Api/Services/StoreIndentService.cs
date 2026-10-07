@@ -11,10 +11,12 @@ namespace StimesErp.Api.Services
     public class StoreIndentService
     {
         private readonly SqlHelper _db;
+        private readonly WebAuditService _audit;
 
-        public StoreIndentService(SqlHelper db)
+        public StoreIndentService(SqlHelper db, WebAuditService audit)
         {
             _db = db;
+            _audit = audit;
         }
 
         // POPPrchsRequisition.GetStoreIndent - list grid (PReqnCode=0) and single-record header
@@ -120,11 +122,14 @@ namespace StimesErp.Api.Services
 
         // subPositionsComboDesc_SelectionChanged_1 - Item/Consumable/TAE lookup fed into the
         // General grid's Type-driven combobox column.
-        public DataTable GetGeneralItemLookup(int typeCode) => typeCode switch
+        public DataTable GetGeneralItemLookup(int typeCode, int branchCode = 0) => typeCode switch
         {
             1 => _db.GetDataTableFromQuery("select ItemCode as ItemCode,isnull(Description,'')+'-'+Convert(varchar,isnull(ItemItemCode,'')) as Description from AdminItemInfo"),
             2 => _db.GetDataTableFromQuery("select ConsumableCode as ItemCode,Description+'-'+Convert(varchar,isnull(ConsumableItemCode,'')) as Description from SalesConsumableInfo"),
-            3 => _db.GetDataTableFromQuery("select ToolsAndEquipmentCode as ItemCode,Description+'-'+Convert(varchar,isnull(TANDEItemCode,'')) as Description from SalesToolsAndEquipmentinfo"),
+            3 => _db.GetDataTableFromQuery("select ToolsAndEquipmentCode as ItemCode,Description+' - '+isnull(AssetCode,'') as Description from SalesToolsAndEquipmentinfo"),
+            4 => _db.GetDataTableFromQuery(
+                "select Accountcode as ItemCode, AccountHead as Description from accAccountHead where BranchCode = @BranchCode order by AccountHead",
+                new[] { SqlHelper.Param("@BranchCode", SqlDbType.Int, branchCode) }),
             _ => new DataTable()
         };
 
@@ -168,9 +173,13 @@ namespace StimesErp.Api.Services
         }
 
         // FillJobList - Sales Order dropdown for txtJobDet (Project mode job/SO selector).
+        // Matches Daily Site's usp_GetDailySiteSalesOrderNo: only the latest revision per
+        // CommonSOCode group (MAX(SOCode)) is listed, instead of every revision.
         public DataTable GetSalesOrders(int branchCode) => _db.GetDataTableFromQuery(
-            "select SOCode,SONo+' - '+Q.QuotationNo+ case when SC.CustomerName is null then '' else ' - '+SC.CustomerName end as SONo, S.ProjectOrLocation " +
-            "from SalesOrderNew S left join sopCustomerInfo SC on SC.CustomerCode=S.CustomerCode left join salesQuotationHdr Q on Q.QuotationCode=S.QuotationCode " +
+            "select S.SOCode,S.SONo+' - '+Q.QuotationNo+ case when SC.CustomerName is null then '' else ' - '+SC.CustomerName end as SONo, S.ProjectOrLocation " +
+            "from SalesOrderNew S " +
+            "inner join (select max(SOCode) as SOCode, CommonSOCode from SalesOrderNew group by CommonSOCode) SM on SM.SOCode = S.SOCode " +
+            "left join sopCustomerInfo SC on SC.CustomerCode=S.CustomerCode left join salesQuotationHdr Q on Q.QuotationCode=S.QuotationCode " +
             "where S.BranchCode=@BranchCode",
             new[] { SqlHelper.Param("@BranchCode", SqlDbType.Int, branchCode) });
 
@@ -265,7 +274,39 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@CheckedByECode", SqlDbType.Int, req.CheckedByECode)
             };
 
-            return _db.DataTransactionsByProcedure("usp_purchase_ManageStoreIndent", p);
+            var result = _db.DataTransactionsByProcedure("usp_purchase_ManageStoreIndent", p);
+            var action = req.PReqnCode > 0 ? "Edited" : "Added";
+            if (req.PReqnCode > 0) _audit.LogEdit("Store Indent", $"{req.RequisitionNo} - Store Indent {action}");
+            else _audit.LogAdd("Store Indent", $"{req.RequisitionNo} - Store Indent {action}");
+            return result;
+        }
+
+        // Runs right after Save() persists the record via the shared manage SP. Independent of
+        // that SP/its TVPs entirely - just flags which rows (by SlNo, looked up by RequisitionNo
+        // rather than threading the Code back through DataTransactionsByProcedure's single-value
+        // result) were manually added ("Direct") vs pulled from the Sales Order's estimation, so
+        // the grid can color them consistently after a reload.
+        public void SetDirectFlags(string requisitionNo, List<StoreIndentItemRow> material, List<StoreIndentItemRow> consumable, List<StoreIndentItemRow> tae)
+        {
+            var p = new[]
+            {
+                SqlHelper.Param("@RequisitionNo", SqlDbType.VarChar, requisitionNo ?? "", 20),
+                SqlHelper.TableParam("@dtMaterialSlNos", "UDT_StoreIndentSlNoList", ToSlNoTable(material)),
+                SqlHelper.TableParam("@dtConsumableSlNos", "UDT_StoreIndentSlNoList", ToSlNoTable(consumable)),
+                SqlHelper.TableParam("@dtTAESlNos", "UDT_StoreIndentSlNoList", ToSlNoTable(tae))
+            };
+            _db.DataTransactionsByProcedure("usp_Purchase_SetStoreIndentDirectFlags", p);
+        }
+
+        private static DataTable ToSlNoTable(List<StoreIndentItemRow> rows)
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("SlNo", typeof(int));
+            foreach (var row in rows.Where(r => r.IsDirect))
+            {
+                dt.Rows.Add(row.SlNo);
+            }
+            return dt;
         }
 
         public string Delete(int pReqnCode, int moduleCode, int userCode)
@@ -276,7 +317,9 @@ namespace StimesErp.Api.Services
                 SqlHelper.Param("@ModuleCode", SqlDbType.Int, moduleCode),
                 SqlHelper.Param("@CurrentUserCode", SqlDbType.Int, userCode)
             };
-            return _db.DataTransactionsByProcedure("usp_purchase_DeleteStoreIndent", p);
+            var result = _db.DataTransactionsByProcedure("usp_purchase_DeleteStoreIndent", p);
+            _audit.LogDelete("Store Indent", $"Store Indent Code {pReqnCode} deleted");
+            return result;
         }
 
         private static DataTable ToGeneralTable(List<StoreIndentGeneralRow> rows)
@@ -325,6 +368,14 @@ namespace StimesErp.Api.Services
             dt.Columns.Add("RequestedQty", typeof(decimal));
             dt.Columns.Add("IssuedQty", typeof(decimal));
             dt.Columns.Add("Remarks", typeof(string));
+            // ERPDB_UDT_StoreIndentMaterial/Consumable/TAE now carry IsDirect as their 8th column
+            // (added purely so the desktop app's own upcoming IsDirect addition has a matching
+            // shape to send into - see StoreIndentService.SetDirectFlags for why the web app
+            // still sets this via its own separate follow-up call rather than reading row.IsDirect
+            // here). A structured TVP parameter must match the target type's column count exactly,
+            // so this column still has to exist even though the web save path currently always
+            // sends it as DBNull and relies on that follow-up call.
+            dt.Columns.Add("IsDirect", typeof(string));
 
             foreach (var row in rows)
             {
@@ -338,6 +389,7 @@ namespace StimesErp.Api.Services
                 dr["RequestedQty"] = row.RequestedQty;
                 dr["IssuedQty"] = row.IssuedQty;
                 dr["Remarks"] = row.Remarks ?? "";
+                dr["IsDirect"] = DBNull.Value;
                 dt.Rows.Add(dr);
             }
             return dt;

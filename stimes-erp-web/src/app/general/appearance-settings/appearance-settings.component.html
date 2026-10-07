@@ -1,0 +1,101 @@
+<div class="page">
+  <header>
+    <div class="title-block">
+      <div class="kicker">General › Basic</div>
+      <h2>Appearance</h2>
+      <p class="subtitle">Choose how the app looks on this device. Changes apply instantly and are saved in this browser.</p>
+    </div>
+    <button type="button" class="reset-button" (click)="resetToDefault()">↺ Reset to default</button>
+  </header>
+
+  <section class="settings-card">
+    <h3>Theme</h3>
+    <p class="hint">Light, dark, or follow your device setting.</p>
+
+    <div class="option-row">
+      @for (opt of themeOptions; track opt.value) {
+        <button type="button" class="option-card" [class.active]="theme.theme() === opt.value" (click)="setTheme(opt.value)">
+          @if (theme.theme() === opt.value) { <span class="check">✓</span> }
+          <span class="preview theme-preview" [class]="opt.value">
+            <span class="bar"></span><span class="line"></span><span class="line short"></span>
+          </span>
+          <span class="option-label">{{ opt.label }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <h3>Accent colour</h3>
+    <p class="hint">Used for buttons, links, highlights, selected items and focus rings in the app frame.</p>
+
+    <div class="accent-grid">
+      @for (swatch of theme.accentPalette; track swatch.key) {
+        <div class="accent-item">
+          <button type="button" class="accent-swatch" [class.active]="theme.accent() === swatch.key" [style.background]="swatch.color" (click)="setAccent(swatch.key)" [title]="swatch.label">
+            @if (theme.accent() === swatch.key) { <span class="check">✓</span> }
+          </button>
+          <span class="accent-label">{{ swatch.label }}</span>
+        </div>
+      }
+
+      <div class="accent-item">
+        <label class="accent-swatch custom-swatch" [class.active]="theme.accent() === 'custom'" [style.background]="theme.accent() === 'custom' ? theme.customColor() : null" title="Pick any colour">
+          @if (theme.accent() === 'custom') { <span class="check">✓</span> }
+          <input type="color" [value]="theme.customColor()" (input)="setCustomColor($any($event.target).value)" />
+        </label>
+        <span class="accent-label">Custom</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-card">
+    <h3>Sidebar</h3>
+    <p class="hint">Colour of the navigation sidebar.</p>
+
+    <div class="option-row">
+      @for (opt of sidebarOptions; track opt.value) {
+        <button type="button" class="option-card wide" [class.active]="theme.sidebarMode() === opt.value" (click)="setSidebarMode(opt.value)">
+          @if (theme.sidebarMode() === opt.value) { <span class="check">✓</span> }
+          <span class="preview sidebar-preview" [class]="opt.value">
+            <span class="rail"></span><span class="body"></span>
+          </span>
+          <span class="option-label">{{ opt.label }}</span>
+          <span class="option-desc">{{ opt.description }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <div class="settings-row">
+    <section class="settings-card half">
+      <h3>Corners</h3>
+      <p class="hint">How rounded buttons, fields and cards are.</p>
+
+      <div class="option-row">
+        @for (opt of cornerOptions; track opt.value) {
+          <button type="button" class="option-card" [class.active]="theme.corners() === opt.value" (click)="setCorners(opt.value)">
+            @if (theme.corners() === opt.value) { <span class="check">✓</span> }
+            <span class="preview corner-preview" [class]="opt.value"></span>
+            <span class="option-label">{{ opt.label }}</span>
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="settings-card half">
+      <h3>Text size</h3>
+      <p class="hint">Scales text and spacing across the whole app.</p>
+
+      <div class="option-row">
+        @for (opt of textSizeOptions; track opt.value) {
+          <button type="button" class="option-card" [class.active]="theme.textSize() === opt.value" (click)="setTextSize(opt.value)">
+            @if (theme.textSize() === opt.value) { <span class="check">✓</span> }
+            <span class="preview text-preview" [class]="opt.value">Aa</span>
+            <span class="option-label">{{ opt.label }}</span>
+          </button>
+        }
+      </div>
+    </section>
+  </div>
+</div>

@@ -1,0 +1,48 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Notification Settings</h2>
+    <div class="filters">
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Form</th><th>Recipients</th><th>Events</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track read(row, 'Code')) {
+          <tr (click)="open(row)">
+            <td>{{ read(row, 'FormName') }}</td>
+            <td>{{ read(row, 'UserCount') }}</td>
+            <td>{{ events(row) }}</td>
+            <td>
+              <span class="status-badge" [class.active]="read(row, 'Active') === 'Y'">
+                {{ read(row, 'Active') === 'Y' ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (rows().length === 0 && !loading()) {
+          <tr><td colspan="5" class="empty">No notification settings configured yet</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

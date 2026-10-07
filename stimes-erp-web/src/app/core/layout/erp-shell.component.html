@@ -1,12 +1,12 @@
-<div class="erp-frame" [class.full-screen]="isFullScreen" [class.modules-open]="showModules">
+<div class="erp-frame" [class.full-screen]="isFullScreen" [class.sidebar-collapsed]="sidebarCollapsed()">
   <header class="topbar" [style.background]="branchColor()">
-    <button class="brand" type="button" (click)="goHome()" (mouseenter)="openModules()" (mouseleave)="scheduleCloseModules()" aria-label="Go to dashboard">
+    <a class="brand" routerLink="/" aria-label="Go to Dashboard">
       <img src="/assets/pc-logo-icon.png" alt="PC Holding" class="brand-icon" />
       <span class="brand-word">
         <img src="/assets/pc-logo-mark.png" alt="PC" class="brand-pc" />
         <img src="/assets/pc-logo-holdings.png" alt="Holdings" class="brand-holdings" />
       </span>
-    </button>
+    </a>
 
     @if (settings.branchName()) {
       <div class="branch-tag">[ {{ settings.branchName() | uppercase }} ]</div>
@@ -14,53 +14,145 @@
 
     <div class="context"><span>Workspace</span><strong>{{ auth.currentUser()?.userName || 'ERP Workspace' }}</strong></div>
     <div class="top-actions">
-      <button type="button" class="settings-button" title="Quick settings" (click)="showQuickSettings = !showQuickSettings"><span class="settings-symbol">&#9881;</span> Settings</button>
-      <button type="button" class="user-button" title="Logout" (click)="logout()"><span class="avatar">{{ (auth.currentUser()?.userName || 'U').charAt(0).toUpperCase() }}</span>{{ auth.currentUser()?.userName || 'User' }} <span class="caret">&#9662;</span></button>
+      <button type="button" class="bell-button" title="Notifications" (click)="toggleNotifications()">
+        <app-icon name="notification" [size]="18" />
+        @if (notificationService.unreadCount() > 0) {
+          <span class="bell-badge">{{ notificationService.unreadCount() > 99 ? '99+' : notificationService.unreadCount() }}</span>
+        }
+      </button>
+      <button type="button" class="settings-button" title="Quick settings" (click)="showQuickSettings = !showQuickSettings; showNotifications = false"><span class="settings-symbol">&#9881;</span><span class="settings-label"> Settings</span></button>
+      <button type="button" class="user-button" title="Logout" (click)="logout()"><span class="avatar">{{ (auth.currentUser()?.userName || 'U').charAt(0).toUpperCase() }}</span><span class="user-name">{{ auth.currentUser()?.userName || 'User' }}</span> <span class="caret">&#9662;</span></button>
     </div>
   </header>
 
   <div class="workspace">
-    @if (showModules) {
-    <aside class="sidebar" (mouseenter)="cancelCloseModules()" (mouseleave)="scheduleCloseModules()">
-      <p class="side-label">MODULES</p>
+    @if (!sidebarCollapsed()) {
+      <div class="sidebar-backdrop" (click)="toggleSidebarCollapsed()"></div>
+    }
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        @if (!sidebarCollapsed()) { <span class="sidebar-title">Menu</span> }
+        <button type="button" class="collapse-toggle" (click)="toggleSidebarCollapsed()" [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
+          <app-icon [name]="sidebarCollapsed() ? 'panel-expand' : 'panel-collapse'" [size]="16" />
+        </button>
+      </div>
+
+      <p class="side-label">OVERVIEW</p>
       <nav>
+        <a class="module dashboard-link" routerLink="/" routerLinkActive="selected" [routerLinkActiveOptions]="{ exact: true }">
+          <span class="module-icon"><app-icon name="dashboard" [size]="16" /></span>
+          <span class="module-label">Dashboard</span>
+        </a>
+      </nav>
+
+      <p class="side-label">MODULES</p>
+      <nav class="module-tree">
         @for (module of modules; track module.label) {
-          <button class="module" [class.selected]="activeModule === module.label" [class.disabled]="!module.available" type="button" (mouseenter)="selectModule(module.label)" (click)="selectModule(module.label)">
-            <span class="module-icon">{{ module.icon }}</span><span>{{ module.label }}</span>
-          </button>
+          @if (accessibleSystemCodes.has(module.systemCode)) {
+            <div class="module-block">
+              <button
+                class="module"
+                [class.disabled]="!module.available"
+                [class.expanded]="isModuleExpanded(module)"
+                type="button"
+                [title]="module.label"
+                (click)="toggleModule(module)">
+                <span class="module-icon"><app-icon [name]="module.icon" [size]="16" /></span>
+                <span class="module-label">{{ module.label }}</span>
+                @if (module.available) {
+                  <span class="tree-chevron"><app-icon [name]="isModuleExpanded(module) ? 'chevron-up' : 'chevron-down'" [size]="13" /></span>
+                }
+              </button>
+
+              @if (module.available && isModuleExpanded(module)) {
+                <div class="group-list">
+                  @for (group of module.children; track group.label) {
+                    <div class="group-block">
+                      <button
+                        class="tree-row group-row"
+                        [class.staged]="group.children.length === 0"
+                        [class.expanded]="isGroupExpanded(module, group)"
+                        type="button"
+                        (click)="toggleGroup(module, group)">
+                        <span class="tree-icon"><app-icon [name]="group.icon" [size]="14" /></span>
+                        <span class="tree-label">{{ group.label }}</span>
+                        @if (group.children.length > 0) {
+                          <span class="tree-chevron"><app-icon [name]="isGroupExpanded(module, group) ? 'chevron-up' : 'chevron-down'" [size]="12" /></span>
+                        } @else {
+                          <small class="staged-tag">soon</small>
+                        }
+                      </button>
+
+                      @if (isGroupExpanded(module, group)) {
+                        <div class="leaf-list">
+                          @for (leaf of group.children; track leaf.route) {
+                            <a class="tree-row leaf-row" [routerLink]="leaf.route" [target]="leaf.target" routerLinkActive="active-leaf">
+                              <span class="tree-icon"><app-icon [name]="leaf.icon" [size]="14" /></span>
+                              <span class="tree-label">{{ leaf.label }}</span>
+                              <span class="leaf-arrow">→</span>
+                            </a>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
         }
       </nav>
-      <div class="sidebar-footer"><span class="status-dot"></span>Connected to ERP</div>
-    </aside>
 
-    <aside class="module-panel" (mouseenter)="cancelCloseModules()" (mouseleave)="scheduleCloseModules()">
-      @if (activeModule) {
-        <p class="panel-kicker">{{ activeModule | uppercase }}</p>
-        <h2>{{ activeModule }}</h2>
-        <div class="detail-list">
-          @for (detail of activeModuleDetails; track detail) {
-            @if (activeModule === 'Operations' && detail === 'Activity') {
-              <button class="detail-link" type="button" (mouseenter)="selectActivity()" (click)="selectActivity()"><span class="detail-icon">AC</span>{{ detail }}<span>-></span></button>
-            } @else if (activeModule === 'Operations Activity' && detail === 'Daily Site') {
-              <a class="detail-link" routerLink="/daily-site" target="daily-site"><span class="detail-icon">DS</span>{{ detail }}<span>→</span></a>
-            } @else if (activeModule === 'Purchase' && detail === 'Activity') {
-              <button class="detail-link" type="button" (mouseenter)="selectPurchaseActivity()" (click)="selectPurchaseActivity()"><span class="detail-icon">AC</span>{{ detail }}<span>-></span></button>
-            } @else if (activeModule === 'Purchase Activity' && detail === 'Store Indent') {
-              <a class="detail-link" routerLink="/store-indent" target="store-indent"><span class="detail-icon">SI</span>{{ detail }}<span>→</span></a>
-            } @else {
-              <button class="detail-link staged" type="button"><span class="detail-icon">{{ detail.slice(0, 2).toUpperCase() }}</span>{{ detail }}<small>staged</small></button>
-            }
-          }
-        </div>
-      } @else {
-        <div class="panel-empty"><span>↗</span><p>Hover a module<br>to view its forms</p></div>
-      }
+      <div class="sidebar-divider"></div>
+      <nav>
+        <!-- Always visible, unlike the rights-gated modules above - appearance is a personal
+             device preference, not a business module, so it shouldn't need a System Admin /
+             General access right just to change how the app looks for yourself. Placed after
+             every module, not in OVERVIEW, so it reads as a settings item, not a module. -->
+        <a class="module" routerLink="/general/appearance" target="appearance-settings">
+          <span class="module-icon"><app-icon name="appearance" [size]="16" /></span>
+          <span class="module-label">Appearance</span>
+        </a>
+      </nav>
+
+      <!-- <div class="sidebar-footer"><span class="status-dot"></span>@if (!sidebarCollapsed()) { <span>Connected to ERP</span> }</div> -->
     </aside>
-    }
 
     <main class="content"><router-outlet /></main>
     <app-confirm-dialog />
   </div>
+
+  @if (showNotifications) {
+    <section class="notification-panel">
+      <div class="settings-heading">
+        <strong>Notifications</strong>
+        <button type="button" (click)="showNotifications = false">&times;</button>
+      </div>
+
+      @if (notifications().length > 0) {
+        <button type="button" class="mark-all-btn" (click)="markAllNotificationsRead()">Mark all read</button>
+      }
+
+      @if (notificationsLoading()) {
+        <p class="settings-loading">Loading...</p>
+      } @else if (notifications().length === 0) {
+        <p class="notification-empty">No notifications yet</p>
+      } @else {
+        <ul class="notification-list">
+          @for (n of notifications(); track n.Code) {
+            <li class="notification-item" [class.unread]="!n.IsRead" (click)="openNotification(n)">
+              <div class="notification-message">{{ n.Message }}</div>
+              <div class="notification-meta">
+                <span>{{ n.FormName }}</span>
+                @if (n.ActorName) { <span> · {{ n.ActorName }}</span> }
+                <span> · {{ n.CreatedDate | date:'dd-MM-yyyy HH:mm' }}</span>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
 
   @if (showQuickSettings) {
     <section class="quick-settings">
@@ -70,7 +162,7 @@
         <p class="settings-loading">Loading...</p>
       } @else {
         <label>Company</label>
-        <select [ngModel]="settings.companyCode()" (ngModelChange)="onCompanyChange($event)">
+        <select [ngModel]="settings.companyCode()" (ngModelChange)="onCompanyChange($event)" disabled>
           @for (company of settings.companies(); track rowValue(company, 'CompanyCode')) {
             <option [value]="rowValue(company, 'CompanyCode')">{{ rowValue(company, 'CompanyName') }}</option>
           }
@@ -91,7 +183,7 @@
         </select>
 
         <label>Processing date</label>
-        <div class="select-value">{{ settings.processingDate() | date:'dd MMM yyyy' }}</div>
+        <app-date-input [ngModel]="settings.processingDate() | date:'yyyy-MM-dd'" (ngModelChange)="onProcessingDateChange($event)" />
 
         @if (settings.errorMessage()) {
           <p class="settings-error">{{ settings.errorMessage() }}</p>

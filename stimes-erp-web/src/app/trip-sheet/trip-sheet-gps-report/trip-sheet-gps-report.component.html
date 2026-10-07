@@ -1,0 +1,90 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Trip Sheet Report</h2>
+    <div class="filters">
+      <label>From Date <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" /></label>
+      <label>To Date <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" /></label>
+      <label class="lookup-filter">
+        Driver
+        <app-multi-select [options]="driverOptions()" placeholder="All drivers"
+               [ngModel]="driverCodes()" (ngModelChange)="driverCodes.set($event)"></app-multi-select>
+      </label>
+      <label class="lookup-filter">
+        Vehicle
+        <app-multi-select [options]="vehicleOptions()" placeholder="All vehicles"
+               [ngModel]="vehicleCodes()" (ngModelChange)="vehicleCodes.set($event)"></app-multi-select>
+      </label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="downloadExcel()">Download Excel</button>
+      <button type="button" (click)="print()">Print</button>
+      <button type="button" (click)="back()">Back</button>
+    </div>
+  </header>
+
+  <p class="print-only date-range">{{ fromDate() | date:'dd-MM-yyyy' }} to {{ toDate() | date:'dd-MM-yyyy' }}</p>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Driver</th><th>Date</th>
+          <th>Route Start</th><th>Start Location</th><th>Start Odometer</th>
+          <th>Route End</th><th>End Location</th><th>End Odometer</th>
+          <th>Distance</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.key) {
+          <tr class="group-row vehicle-group" (click)="toggle(group.key)">
+            <td colspan="9">
+              <span class="chevron" [class.collapsed]="isCollapsed(group.key)">▾</span>
+              {{ group.label }}
+              <span class="group-total">Total: {{ group.totalDistanceKm }} km</span>
+            </td>
+          </tr>
+
+          @if (!isCollapsed(group.key)) {
+            @for (row of group.rows; track (read(row, 'VehicleCode') + '-' + read(row, 'RouteStart'))) {
+              <tr>
+                <td>{{ read(row, 'DriverName') || '-' }}</td>
+                <td>{{ read(row, 'TripDate') | date:'dd-MM-yyyy' }}</td>
+                <td>{{ read(row, 'RouteStart') ? (read(row, 'RouteStart') | date:'HH:mm:ss') : '-' }}</td>
+                <td>
+                  @if (mapLink(read(row, 'StartLocation'), read(row, 'StartLatitude'), read(row, 'StartLongitude')); as link) {
+                    <a [href]="link" target="_blank" rel="noopener">{{ read(row, 'StartLocation') }}</a>
+                  } @else { - }
+                </td>
+                <td>{{ read(row, 'StartOdometer') ?? '-' }}</td>
+                <td>{{ read(row, 'RouteEnd') ? (read(row, 'RouteEnd') | date:'HH:mm:ss') : '(ongoing)' }}</td>
+                <td>
+                  @if (mapLink(read(row, 'EndLocation'), read(row, 'EndLatitude'), read(row, 'EndLongitude')); as link) {
+                    <a [href]="link" target="_blank" rel="noopener">{{ read(row, 'EndLocation') }}</a>
+                  } @else { - }
+                </td>
+                <td>{{ read(row, 'EndOdometer') ?? '-' }}</td>
+                <td>{{ read(row, 'DistanceKm') != null ? (read(row, 'DistanceKm') + ' km') : '-' }}</td>
+              </tr>
+            }
+          }
+        }
+        @if (groups().length === 0 && !loading()) {
+          <tr><td colspan="9" class="empty">No GPS trip data found for this filter</td></tr>
+        }
+      </tbody>
+      @if (groups().length > 0) {
+        <tfoot>
+          <tr><td colspan="8" class="total-label">Total</td><td class="total-value">{{ totalDistanceKm() }} km</td></tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+  }
+</div>

@@ -1,4 +1,9 @@
 <div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
   <header>
     <h2>Daily Site List</h2>
     <div class="filters">
@@ -14,7 +19,7 @@
           <option [value]="y">{{ y }}</option>
         }
       </select>
-      <button (click)="openNew()">+ New</button>
+      <button (click)="openNew()" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''">+ New</button>
     </div>
   </header>
 
@@ -47,7 +52,7 @@
                  (ngModelChange)="updateFilter('docNo', $event)" />
         </th>
         <th class="date-column">
-          <input type="date"
+          <app-date-input
                  [ngModel]="filters().docDate"
                  (ngModelChange)="updateFilter('docDate', $event)" />
         </th>
@@ -105,7 +110,11 @@
                       <td>{{ rowValue(row, 'Project') }}</td>
                       <td>{{ rowValue(row, 'PStatus') }}</td>
                       <td class="actions-column">
-                        <button type="button" class="delete-btn" (click)="deleteRow(row, $event)">Delete</button>
+                        @if (rights().delete) {
+                          <button type="button" class="delete-btn" [disabled]="isEditLocked(row)"
+                                  [title]="isEditLocked(row) ? 'More than 24 hours old - only an ADMIN user can delete this' : ''"
+                                  (click)="deleteRow(row, $event)">Delete</button>
+                        }
                       </td>
                     </tr>
                   }
@@ -118,4 +127,5 @@
     </tbody>
   </table>
   </div>
+  }
 </div>

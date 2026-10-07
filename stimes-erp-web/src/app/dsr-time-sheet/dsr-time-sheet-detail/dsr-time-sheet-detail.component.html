@@ -1,0 +1,239 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Payroll · DSR Time Sheet</div>
+      <h2>{{ isNew ? 'New DSR Time Sheet' : form.get('dsrNumber')?.value }}</h2>
+    </div>
+    <div class="actions">
+      @if (!isNew) {
+        <button type="button" (click)="print()">Print</button>
+      }
+      @if (!isNew && rights().delete) {
+        <button type="button" class="danger" (click)="deleteRecord()">Delete</button>
+      }
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving() || !canSave()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="tab-bar">
+    <button type="button" [class.active]="activeTab() === 'entry'" (click)="activeTab.set('entry')">Daily Time Sheet</button>
+    @if (approvalEnabled()) {
+      <button type="button" [class.active]="activeTab() === 'approval'" (click)="activeTab.set('approval')">Approval</button>
+    }
+  </div>
+
+  <form [formGroup]="form" class="form-body" [hidden]="activeTab() !== 'entry'">
+    <div class="card">
+      <div class="card-body">
+        <div class="field-grid three">
+          <div>
+            <label>DSR Number</label>
+            <input formControlName="dsrNumber" readonly />
+          </div>
+          <div>
+            <label>DSR Date <span class="required">*</span></label>
+            <input type="date" formControlName="dsrDate" />
+          </div>
+          <div>
+            <button type="button" class="load-btn" [disabled]="loadingAttendance()" (click)="loadFromDailySite()">
+              {{ loadingAttendance() ? 'Loading...' : '↻ Load Attendance' }}
+            </button>
+          </div>
+        </div>
+        @if (isHolidayDate()) {
+          <p class="holiday-flag">This date is a Sunday/Holiday - OT2 applies instead of Basic/OT1.</p>
+        }
+        <label>Remarks</label>
+        <textarea formControlName="remarks" rows="2" placeholder="Remarks"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        DSR Time Sheet Details
+        <span class="summary-tag">
+          Present {{ totals().present }} · Absent {{ totals().absent }} · Idle {{ totals().idleCount }}
+        </span>
+      </div>
+      @if (lines().length === 0) {
+        <p class="hint" style="padding: 16px;">No rows yet - pick a DSR Date and click "Load Attendance".</p>
+      } @else {
+        <div class="grid-filters">
+          <label>
+            <span>Status</span>
+            <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)" [ngModelOptions]="{standalone: true}">
+              <option [ngValue]="''">All statuses</option>
+              @for (s of attendanceStatuses(); track read(s, 'AttStatusCode')) {
+                <option [ngValue]="toNumber(read(s, 'AttStatusCode'))">{{ read(s, 'AttStatusDesc') }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            <span>Employee</span>
+            <input type="text" placeholder="Search employee..." [ngModel]="filterEmployeeText()" (ngModelChange)="filterEmployeeText.set($event)" [ngModelOptions]="{standalone: true}" />
+          </label>
+          @if (filterStatus() !== '' || filterEmployeeText()) {
+            <button type="button" class="clear-filters-btn" (click)="clearLineFilters()">Clear filters</button>
+          }
+        </div>
+      }
+      @if (lines().length > 0 && groupedLines().length === 0) {
+        <p class="hint" style="padding: 16px;">No rows match the current filters.</p>
+      }
+      @for (group of groupedLines(); track group.category) {
+        <button type="button" class="category-title" (click)="toggleCategory(group.category)">
+          <span class="chevron" [class.collapsed]="isCategoryCollapsed(group.category)">▾</span>
+          {{ group.category }}
+          <span class="category-count">({{ group.rows.length }})</span>
+        </button>
+        @if (!isCategoryCollapsed(group.category)) {
+        <div class="table-scroll">
+          <table class="dsr-table">
+            <colgroup>
+              <col style="width: 40px" /><col style="width: 180px" /><col style="width: 130px" /><col style="width: 140px" />
+              <col style="width: 130px" /><col style="width: 90px" /><col style="width: 80px" /><col style="width: 80px" />
+              <col style="width: 80px" /><col style="width: 80px" /><col style="width: 80px" /><col style="width: 50px" /><col style="width: 40px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Sl</th><th>Employee</th><th>Job No</th><th>Supervisor</th><th>Status</th>
+                <th class="amount">Actual Hrs</th><th class="amount">Basic</th><th class="amount">OT1</th><th class="amount">OT2</th><th class="amount">Paid</th><th class="amount">Idle</th><th>Idle?</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of group.rows; track line.employeeCode) {
+                <tr [class]="rowClass(line.attStatusCode)">
+                  <td>{{ line.slNo }}</td>
+                  <td>{{ line.empFullName }}</td>
+                  <td>{{ line.soNo || '-' }}</td>
+                  <td>{{ line.supervisor || '-' }}</td>
+                  <td>{{ statusLabel(line.attStatusCode) }}</td>
+                  <td class="amount-input">{{ line.actualHrs }}</td>
+                  <td class="amount-input">{{ line.basic }}</td>
+                  <td class="amount-input">{{ line.ot1 }}</td>
+                  <td class="amount-input">{{ line.ot2 }}</td>
+                  <td class="amount-input">{{ line.paid }}</td>
+                  <td class="amount-input">{{ line.idle }}</td>
+                  <td class="idle-cell"><input type="checkbox" [checked]="line.isIdle" (change)="toggleIdle(line)" /></td>
+                  <td><button type="button" class="remove-btn" (click)="removeLine(line)">✕</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        }
+      }
+      @if (lines().length > 0) {
+        <div class="totals-row">
+          <span>Actual: {{ totals().actualHrs }}</span>
+          <span>Basic: {{ totals().basic }}</span>
+          <span>OT1: {{ totals().ot1 }}</span>
+          <span>OT2: {{ totals().ot2 }}</span>
+          <span>Paid: {{ totals().paid }}</span>
+          <span>Idle: {{ totals().idle }}</span>
+        </div>
+      }
+    </div>
+
+    @if (jobSummary().length > 0) {
+      <div class="card">
+        <div class="card-title">Job-wise Summary</div>
+        <div class="table-scroll">
+          <table class="job-summary-table">
+            <colgroup>
+              <col style="width: 40px" /><col style="width: 220px" /><col style="width: 110px" />
+              <col style="width: 110px" /><col style="width: 110px" /><col style="width: 110px" /><col style="width: 110px" />
+            </colgroup>
+            <thead>
+              <tr><th>Sl</th><th>Job No</th><th class="amount">Actual Hrs</th><th class="amount">Basic</th><th class="amount">OT</th><th class="amount">Paid</th><th class="amount">Idle</th></tr>
+            </thead>
+            <tbody>
+              @for (job of jobSummary(); track job.soNo) {
+                <tr>
+                  <td>{{ job.slNo }}</td>
+                  <td>{{ job.soNo }}</td>
+                  <td class="amount-input">{{ job.actualHrs }}</td>
+                  <td class="amount-input">{{ job.basic }}</td>
+                  <td class="amount-input">{{ job.ot }}</td>
+                  <td class="amount-input">{{ job.paid }}</td>
+                  <td class="amount-input">{{ job.idle }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  </form>
+
+  <!-- ============ APPROVAL (generic widget, identical pattern to Store Indent) ============ -->
+  @if (approvalEnabled()) {
+    <section class="card approval-card" [hidden]="activeTab() !== 'approval'">
+      @if (isNew) {
+        <p class="hint">Save the record first to use the approval workflow.</p>
+      } @else if (!approvalVisible()) {
+        <p class="hint">Approval is not applicable for you on this record.</p>
+      } @else {
+        <div class="approval-status">
+          <span class="status-badge" [class.status-approved]="read(approvalAction(), 'CurrentStatus') === 'A'"
+                [class.status-denied]="read(approvalAction(), 'CurrentStatus') === 'D'">
+            {{ read(approvalAction(), 'CurrentStatus') === 'A' ? 'Approved' : read(approvalAction(), 'CurrentStatus') === 'D' ? 'Denied' : 'Pending' }}
+          </span>
+          <button type="button" class="secondary" (click)="toggleLock()" [disabled]="approvalBusy()">
+            {{ read(approvalAction(), 'IsLocked') === 'L' ? 'Unlock' : 'Lock' }}
+          </button>
+        </div>
+
+        <div class="field-grid three">
+          <div class="field"><label>Created By</label><input [value]="read(approvalAction(), 'CreatedUser')" readonly /></div>
+          <div class="field"><label>Created On</label><input [value]="read(approvalAction(), 'CreatedDateTime')" readonly /></div>
+          <div class="field"><label>Last Modified By</label><input [value]="read(approvalAction(), 'UpdatedUser')" readonly /></div>
+          <div class="field"><label>Last Modified On</label><input [value]="read(approvalAction(), 'UpdatedDateTime')" readonly /></div>
+          <div class="field"><label>Last Approved By</label><input [value]="read(approvalAction(), 'LastApprovedUser')" readonly /></div>
+          <div class="field"><label>Last Approved On</label><input [value]="read(approvalAction(), 'LastApprovedDateTime')" readonly /></div>
+        </div>
+
+        <div class="field full-width">
+          <label>Comment</label>
+          <textarea rows="2" [value]="approvalComment()" (input)="updateApprovalComment($any($event.target).value)"></textarea>
+        </div>
+
+        <div class="approval-actions">
+          <button type="button" class="approve-btn" [disabled]="approvalBusy() || read(approvalAction(), 'ApproveIsEnable') !== 'Y'" (click)="approve()">Approve</button>
+          <button type="button" class="deny-btn" [disabled]="approvalBusy() || read(approvalAction(), 'DenayIsEnable') !== 'Y'" (click)="deny()">Deny</button>
+          <button type="button" class="secondary" (click)="loadApprovalHistory()">View History</button>
+        </div>
+
+        @if (approvalHistory()) {
+          <div class="history-block">
+            <h4>Action History</h4>
+            @for (table of approvalHistory(); track $index) {
+              <div class="table-scroll">
+                <table>
+                  @if (table.length > 0) {
+                    <thead><tr>@for (key of objectKeys(table[0]); track key) {<th>{{ key }}</th>}</tr></thead>
+                    <tbody>
+                      @for (row of table; track $index) {
+                        <tr>@for (key of objectKeys(table[0]); track key) {<td>{{ row[key] }}</td>}</tr>
+                      }
+                    </tbody>
+                  }
+                </table>
+              </div>
+            }
+          </div>
+        }
+      }
+    </section>
+  }
+  }
+</div>

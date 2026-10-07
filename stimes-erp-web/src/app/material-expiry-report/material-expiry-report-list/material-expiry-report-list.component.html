@@ -1,0 +1,108 @@
+<div class="page">
+  <header>
+    <div class="kicker">Purchase › Report</div>
+    <h2>Material Expiry Report</h2>
+  </header>
+
+  <div class="filters">
+    <label>
+      <span>From Date</span>
+      <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" />
+    </label>
+    <label>
+      <span>To Date</span>
+      <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" />
+    </label>
+    <label>
+      <span>Branch</span>
+      <select [ngModel]="branchCode()" (ngModelChange)="branchCode.set($event)">
+        <option [ngValue]="0">All Branches</option>
+        @for (b of settings.branches(); track read(b, 'BranchCode')) {
+          <option [ngValue]="toNumber(read(b, 'BranchCode'))">{{ read(b, 'BranchName') }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Warehouse / Location</span>
+      <select [ngModel]="warehouse()" (ngModelChange)="warehouse.set($event)">
+        <option value="">All Warehouses</option>
+        @for (w of warehouses(); track w) {
+          <option [value]="w">{{ w }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Material / Item</span>
+      <input type="text" list="material-options" placeholder="All Materials"
+             [ngModel]="materialDisplayText()" (ngModelChange)="onMaterialTextChanged($event)" />
+      <datalist id="material-options">
+        @for (m of materials(); track read(m, 'ItemCode')) {
+          <option [value]="read(m, 'ItemCode') + ' - ' + read(m, 'Description')"></option>
+        }
+      </datalist>
+    </label>
+    <label>
+      <span>Material Category</span>
+      <select [ngModel]="matCategory()" (ngModelChange)="matCategory.set($event)">
+        <option value="">All Categories</option>
+        @for (c of matCategories(); track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Supplier</span>
+      <input type="text" list="supplier-options" placeholder="All Suppliers"
+             [ngModel]="supplier()" (ngModelChange)="supplier.set($event)" />
+      <datalist id="supplier-options">
+        @for (s of suppliers(); track s) { <option [value]="s"></option> }
+      </datalist>
+    </label>
+    <label>
+      <span>Expiry Status</span>
+      <select [ngModel]="expiryStatus()" (ngModelChange)="expiryStatus.set($event)">
+        @for (opt of expiryStatusOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+      </select>
+    </label>
+    <button type="button" class="primary" (click)="load()" [disabled]="loading()">{{ loading() ? 'Loading...' : 'Search' }}</button>
+    <button type="button" (click)="clearFilters()">Clear</button>
+    <button type="button" [disabled]="exporting() || rows().length === 0" (click)="exportToExcel()">
+      {{ exporting() ? 'Exporting...' : 'Export to Excel' }}
+    </button>
+    <button type="button" (click)="print()">Print</button>
+  </div>
+
+  <p class="print-only date-range">{{ fromDate() || 'All Dates' }} to {{ toDate() || 'All Dates' }}</p>
+
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Sl No</th><th>Material Code</th><th>Material Name</th><th>Batch No</th><th>Warehouse</th>
+          <th class="amount">Stock Qty</th><th>Unit</th><th>Expiry Date</th><th class="amount">Days to Expire</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track $index; let i = $index) {
+          <tr [class]="statusClass(read(row, 'Status'))">
+            <td>{{ i + 1 }}</td>
+            <td>{{ read(row, 'MaterialCode') }}</td>
+            <td>{{ read(row, 'MaterialName') }}</td>
+            <td>{{ read(row, 'BatchNo') || '-' }}</td>
+            <td>{{ read(row, 'WareHouseName') || '-' }}</td>
+            <td class="amount">{{ read(row, 'Qty') }}</td>
+            <td>{{ read(row, 'Unit') }}</td>
+            <td>{{ read(row, 'ExpiryDate') | date:'dd-MMM-yyyy' }}</td>
+            <td class="amount">{{ read(row, 'DaysToExpire') }}</td>
+            <td><span class="status-badge">{{ read(row, 'Status') }}</span></td>
+          </tr>
+        }
+        @if (rows().length === 0 && !loading()) {
+          <tr><td colspan="10" class="empty">No materials match this filter.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

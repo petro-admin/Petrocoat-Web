@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StimesErp.Api.Data;
 using StimesErp.Api.Json;
@@ -18,14 +19,38 @@ builder.Services.AddControllers().AddJsonOptions(opts =>
     opts.JsonSerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString;
 });
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<SqlHelper>();
+builder.Services.AddScoped<WebAuditService>();
+builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<FaceLoginService>();
+builder.Services.AddDbContext<MaterialExpiryDbContext>(opt =>
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("ErpDb")));
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DailySiteService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<StoreIndentService>();
+builder.Services.AddScoped<ManpowerScheduleService>();
+builder.Services.AddScoped<ResourceReportService>();
 builder.Services.AddScoped<ApprovalService>();
 builder.Services.AddScoped<UserRightsService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<VehicleServiceRepairService>();
+builder.Services.AddScoped<GpsWebhookService>();
+builder.Services.AddScoped<NotificationSettingsService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<TripSheetService>();
+builder.Services.AddScoped<LabourAttendanceService>();
+builder.Services.AddScoped<StaffAttendanceService>();
+builder.Services.AddScoped<LeaveApplicationService>();
+builder.Services.AddScoped<ResourceReturnService>();
+builder.Services.AddScoped<AccidentReportService>();
+builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<VehicleHandoverService>();
+builder.Services.AddScoped<DSRTimeSheetService>();
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<MaterialExpiryReportService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

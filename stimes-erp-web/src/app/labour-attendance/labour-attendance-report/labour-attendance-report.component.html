@@ -1,0 +1,87 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Attendance Report</h2>
+    <div class="mode-toggle">
+      <label [class.active]="mode() === 'labour'">
+        <input type="radio" name="attendance-mode" value="labour" [checked]="mode() === 'labour'" (change)="setMode('labour')" /> Labour
+      </label>
+      <label [class.active]="mode() === 'staff'">
+        <input type="radio" name="attendance-mode" value="staff" [checked]="mode() === 'staff'" (change)="setMode('staff')" /> Staff
+      </label>
+    </div>
+    <div class="filters">
+      <label>From <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" /></label>
+      <label>To <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" /></label>
+      @if (mode() === 'labour') {
+        <label class="job-filter">
+          Job
+          <input [ngModel]="jobNoText()" (ngModelChange)="jobNoText.set($event)" list="report-job-options" placeholder="All jobs"
+                 (input)="onJobTextChanged($any($event.target).value)" (change)="onJobSelected($any($event.target).value)" />
+          <datalist id="report-job-options">@for (so of salesOrders(); track read(so, 'SOCode')) {<option [value]="read(so, 'SONo')"></option>}</datalist>
+        </label>
+      }
+      <label class="job-filter">
+        Employee
+        <input [ngModel]="employeeText()" (ngModelChange)="employeeText.set($event)" list="report-employee-options" placeholder="All employees"
+               (input)="onEmployeeTextChanged($any($event.target).value)" (change)="onEmployeeSelected($any($event.target).value)" />
+        <datalist id="report-employee-options">@for (e of employees(); track read(e, 'EmployeeCode')) {<option [value]="read(e, 'EmpFullName')"></option>}</datalist>
+      </label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="back()">Back</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Photo</th><th>Employee</th>
+          @if (mode() === 'labour') { <th>Job</th> }
+          <th>Date</th>
+          <th>Check In</th><th>Check In Location</th>
+          <th>Check Out</th><th>Check Out Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track read(row, 'Code')) {
+          <tr>
+            <td>
+              @if (photoUrls()[toNumber(read(row, 'EmployeeCode'))]; as url) {
+                <img [src]="url" class="avatar" />
+              } @else {
+                <span class="avatar-placeholder">{{ read(row, 'EmpFullName')?.charAt(0) }}</span>
+              }
+            </td>
+            <td>{{ read(row, 'EmpFullName') }}</td>
+            @if (mode() === 'labour') { <td>{{ read(row, 'SONo') || '-' }}</td> }
+            <td>{{ read(row, 'DocDate') | date:'dd-MM-yyyy' }}</td>
+            <td>{{ read(row, 'CheckInTime') ? (read(row, 'CheckInTime') | date:'HH:mm:ss') : '-' }}</td>
+            <td>
+              @if (mapLink(read(row, 'CheckInLatitude'), read(row, 'CheckInLongitude')); as link) {
+                <a [href]="link" target="_blank" rel="noopener">View Map</a>
+              } @else { - }
+            </td>
+            <td>{{ read(row, 'CheckOutTime') ? (read(row, 'CheckOutTime') | date:'HH:mm:ss') : '-' }}</td>
+            <td>
+              @if (mapLink(read(row, 'CheckOutLatitude'), read(row, 'CheckOutLongitude')); as link) {
+                <a [href]="link" target="_blank" rel="noopener">View Map</a>
+              } @else { - }
+            </td>
+          </tr>
+        }
+        @if (rows().length === 0 && !loading()) {
+          <tr><td [attr.colspan]="mode() === 'labour' ? 8 : 7" class="empty">No attendance records found for this filter</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

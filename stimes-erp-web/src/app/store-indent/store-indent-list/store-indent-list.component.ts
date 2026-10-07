@@ -7,6 +7,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { ApprovalService } from '../../core/services/approval.service';
 import { UserRightsService, UserRights, NO_RIGHTS } from '../../core/services/user-rights.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 const FORM_CLASS_NAME = 'Stimes.Erp.App.Win.Purchase.StoreIndent';
 
@@ -31,7 +32,7 @@ interface StatusGroup {
 @Component({
   selector: 'app-store-indent-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './store-indent-list.component.html',
   styleUrl: './store-indent-list.component.scss'
 })
@@ -56,6 +57,7 @@ export class StoreIndentListComponent implements OnInit {
 
   // Matches desktop's CheckPermission() (myUserRights.ADD/DELETE) - gates "+ New" and Delete.
   rights = signal<UserRights>(NO_RIGHTS);
+  rightsLoaded = signal(false);
   private moduleCode = 0;
 
   filters = signal({ docNo: '', docDate: '', details: '', type: '' });
@@ -81,6 +83,12 @@ export class StoreIndentListComponent implements OnInit {
     private userRightsService: UserRightsService,
     private confirmDialog: ConfirmDialogService
   ) {
+    // Matches desktop's StoreIndent constructor seeding ddlMonth/ddlYear from StaticClass.ProcessingDate
+    // before the first BindGeneralGrid() call, instead of the browser's system date.
+    const processingDate = this.settings.processingDate() ?? new Date();
+    this.selectedMonth = processingDate.getMonth() + 1;
+    this.selectedYear = processingDate.getFullYear();
+
     const currentYear = new Date().getFullYear();
     for (let y = currentYear - 5; y <= currentYear + 1; y++) this.years.push(y);
   }
@@ -93,8 +101,8 @@ export class StoreIndentListComponent implements OnInit {
 
   private loadRights(): void {
     this.userRightsService.getRights(FORM_CLASS_NAME).subscribe({
-      next: rights => this.rights.set(rights),
-      error: () => this.rights.set(NO_RIGHTS)
+      next: rights => { this.rights.set(rights); this.rightsLoaded.set(true); },
+      error: () => { this.rights.set(NO_RIGHTS); this.rightsLoaded.set(true); }
     });
   }
 
@@ -256,10 +264,30 @@ export class StoreIndentListComponent implements OnInit {
           this.errorMessage.set('Deletion Not Permitted !!! This Requisition has been Locked!');
           return;
         }
-        this.performDelete(id);
+        this.deleteWithActionCheck(id);
       },
       // No approval configuration for this record/user - matches desktop, which leaves the
       // lock check un-applied (defaults to "Unlocked") when there is nothing to check against.
+      error: () => this.deleteWithActionCheck(id)
+    });
+  }
+
+  // Matches desktop's DeleteButton_Click: after the lock check, VerifyTransactionWithApprovalStatus
+  // checks whether any other user has already taken approval action on this record, and if so warns
+  // before letting the delete proceed - same pattern already used in the detail screen's save().
+  private deleteWithActionCheck(id: number): void {
+    this.approvalService.verify(FORM_CLASS_NAME, id).subscribe({
+      next: async ({ count }) => {
+        if (count > 0) {
+          if (!(await this.confirmDialog.confirm("Some other users took action over this file.\nSo you can't delete or update before deleting that actions.\n\nDo you want to delete all actions over this file?"))) return;
+          this.approvalService.clearActions(FORM_CLASS_NAME, id, this.moduleCode).subscribe({
+            next: () => this.performDelete(id),
+            error: () => this.errorMessage.set('Transaction Failed...')
+          });
+        } else {
+          this.performDelete(id);
+        }
+      },
       error: () => this.performDelete(id)
     });
   }

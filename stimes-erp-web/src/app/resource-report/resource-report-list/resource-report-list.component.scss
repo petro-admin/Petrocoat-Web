@@ -1,0 +1,237 @@
+:host {
+  display: block;
+  --radius-lg: 14px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+}
+
+header {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 20px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  &:last-child { margin-bottom: 0; }
+
+  label { font-size: 12px; font-weight: 600; color: var(--ink-muted); margin-bottom: 6px; letter-spacing: .01em; }
+
+  input, select {
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    min-height: 40px;
+    &:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+    &[readonly] { color: var(--ink-muted); background: var(--surface-sunken); }
+  }
+}
+
+.grid-2 .field { margin-bottom: 0; }
+
+.type-row { margin-bottom: 16px; }
+
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  min-height: 40px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+
+  input { width: 16px; height: 16px; min-height: 0; accent-color: var(--accent); cursor: pointer; }
+}
+
+.actions-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primary {
+  padding: 10px 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+  &:hover:not(:disabled) { background: var(--accent-dark); }
+  &:disabled { opacity: .6; cursor: default; }
+}
+
+.results-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.secondary {
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+  &:hover:not(:disabled) { background: var(--surface-sunken); }
+  &:disabled { opacity: .6; cursor: default; }
+}
+
+.table-scroll {
+  overflow: auto;
+  max-height: 60vh;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  scrollbar-width: thin;
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  padding: 11px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+tbody tr:hover td { background: var(--surface-muted); }
+
+.group-row.job-group {
+  cursor: pointer;
+  td {
+    background: var(--accent-light);
+    color: var(--accent-dark);
+    font-weight: 700;
+    font-size: 12.5px;
+    border-left: 4px solid var(--accent);
+    white-space: normal;
+  }
+  &:hover td { background: var(--accent-light); filter: brightness(0.97); }
+
+  .chevron {
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+    &.collapsed { transform: rotate(-90deg); }
+  }
+}
+
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+td.negative { color: #c0392b; font-weight: 600; }
+
+tfoot td {
+  border-top: 2px solid var(--border-strong);
+  border-bottom: none;
+  background: var(--surface-muted);
+}
+
+.empty { text-align: center; color: var(--ink-faint); padding: 24px; }
+
+@media (max-width: 640px) {
+  .page { padding: 12px 12px 60px; }
+  header { padding: 14px; h2 { font-size: 17px; } }
+  .card { padding: 14px; }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+.print-only { display: none; }
+
+// Matches Trip Sheet Report's own Print button convention - hide the filter card and toolbar
+// buttons, let the results table print un-clipped instead of staying trapped in its on-screen
+// scroll box (.table-scroll normally caps height + hides overflow, which would otherwise cut the
+// printed output off after one screen's worth of rows).
+@media print {
+  :host { background: #fff; }
+  .page { background: #fff; padding: 0; }
+  .filters-card, .results-toolbar, .hint { display: none !important; }
+  header { box-shadow: none; border: none; padding: 0 0 8px; }
+  .print-only { display: block; color: var(--ink-muted); font-size: 12.5px; margin: 0 0 10px; }
+  .card { box-shadow: none; border: none; padding: 0; }
+  .table-scroll { max-height: none; overflow: visible; border: none; }
+  th { position: static; }
+}

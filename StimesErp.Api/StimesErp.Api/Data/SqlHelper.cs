@@ -74,6 +74,17 @@ namespace StimesErp.Api.Data
             return dt;
         }
 
+        /// <summary>Runs a plain parameterized INSERT/UPDATE/DELETE against a table directly (no stored
+        /// procedure) - for tables with no existing SP wrapper, like GpsWebhookEvent.</summary>
+        public void ExecuteNonQuery(string sql, SqlParameter[]? parameters = null)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(sql, conn) { CommandType = CommandType.Text };
+            if (parameters != null) cmd.Parameters.AddRange(parameters);
+            conn.Open();
+            cmd.ExecuteNonQuery();
+        }
+
         public static SqlParameter Param(string name, SqlDbType type, object? value, int size = 0)
         {
             var p = new SqlParameter(name, type);

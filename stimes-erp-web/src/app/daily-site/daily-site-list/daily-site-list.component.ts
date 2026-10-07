@@ -5,6 +5,13 @@ import { Router } from '@angular/router';
 import { DailySiteService } from '../services/daily-site.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { AuthService } from '../../core/services/auth.service';
+import { UserRightsService, UserRights, NO_RIGHTS } from '../../core/services/user-rights.service';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
+
+// Matches this.GetType().ToString() in the desktop app's DailySite.xaml.cs - the key
+// usp_GetUserRightSecurity / usp_admin_GetApprovalSettingsHDR_By_FormClassName look up by.
+const FORM_CLASS_NAME = 'Stimes.Erp.App.Win.Production.DailySite';
 
 interface JobDescGroup {
   key: string;      // composite key for collapse state, e.g. "BranchA|DivisionX|JobDescY"
@@ -28,7 +35,7 @@ interface BranchGroup {
 @Component({
   selector: 'app-daily-site-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './daily-site-list.component.html',
   styleUrl: './daily-site-list.component.scss'
 })
@@ -78,18 +85,41 @@ export class DailySiteListComponent implements OnInit {
 
   branchGroups = computed<BranchGroup[]>(() => this.buildGroups(this.filteredRows()));
 
+  // Matches desktop's CheckPermission() (myUserRights.ADD/DELETE) - gates "+ New" and Delete.
+  // rightsLoaded additionally gates the whole page: matches CheckMenu()/form-open permission
+  // checks on desktop - a user with no Access right for this form never sees it load at all,
+  // not just individual buttons disabled.
+  rights = signal<UserRights>(NO_RIGHTS);
+  rightsLoaded = signal(false);
+
   constructor(
     private dailySiteService: DailySiteService,
     private settings: SettingsService,
     private router: Router,
-    private confirmDialog: ConfirmDialogService
+    private confirmDialog: ConfirmDialogService,
+    private auth: AuthService,
+    private userRightsService: UserRightsService
   ) {
+    // Matches desktop's DailySite constructor seeding ddlMonth/ddlYear from StaticClass.ProcessingDate
+    // before the first BindSideGrid() call, instead of the browser's system date.
+    const processingDate = this.settings.processingDate() ?? new Date();
+    this.selectedMonth = processingDate.getMonth() + 1;
+    this.selectedYear = processingDate.getFullYear();
+
     const currentYear = new Date().getFullYear();
     for (let y = currentYear - 5; y <= currentYear + 1; y++) this.years.push(y);
   }
 
   ngOnInit(): void {
     this.refresh();
+    this.loadRights();
+  }
+
+  private loadRights(): void {
+    this.userRightsService.getRights(FORM_CLASS_NAME).subscribe({
+      next: rights => { this.rights.set(rights); this.rightsLoaded.set(true); },
+      error: () => { this.rights.set(NO_RIGHTS); this.rightsLoaded.set(true); }
+    });
   }
 
   refresh(): void {
@@ -205,6 +235,10 @@ export class DailySiteListComponent implements OnInit {
   // "+ New" navigates in the current tab, same as editing a row - only switching to a different
   // form/module (the flyout menu links) opens a new tab.
   openNew(): void {
+    if (!this.rights().add) {
+      this.errorMessage.set('You do not have permission to add.');
+      return;
+    }
     this.router.navigate(['/daily-site', 0]);
   }
 
@@ -213,12 +247,33 @@ export class DailySiteListComponent implements OnInit {
     this.router.navigate(['/daily-site', this.read(row, 'DailySiteCode')]);
   }
 
+  // AdminUserCategoryInfo: 1 = ADMIN. A normal user (any other UCatCode) can only delete a Daily
+  // Site within 24 hours of its own Doc Date - matches the same lock enforced in the detail
+  // form's Save (and server-side in DailySiteService.CheckEditWindow).
+  isEditLocked(row: any): boolean {
+    if (this.auth.currentUser()?.uCatCode === 1) return false;
+    const docDate = this.read(row, 'DocDate');
+    if (!docDate) return false;
+    const hours = (Date.now() - new Date(docDate).getTime()) / 3600000;
+    return hours > 24;
+  }
+
   async deleteRow(row: any, event: Event): Promise<void> {
     event.stopPropagation();
 
     const id = Number(this.read(row, 'DailySiteCode'));
     if (!id) {
       this.errorMessage.set('Choose an item to delete...!');
+      return;
+    }
+
+    if (!this.rights().delete) {
+      this.errorMessage.set('You do not have permission to delete.');
+      return;
+    }
+
+    if (this.isEditLocked(row)) {
+      this.errorMessage.set('This record is more than 24 hours old and can no longer be deleted.');
       return;
     }
 

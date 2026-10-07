@@ -26,7 +26,12 @@ export class SettingsService {
   selectedPeriod = computed(() =>
     this.financialPeriods().find(row => Number(this.read(row, 'PeriodId')) === this.periodId()));
 
-  processingDate = computed(() => this.computeProcessingDate(this.selectedPeriod()));
+  // Matches desktop's TxtProcessingDate DatePicker: FillDefaultDate() seeds a default from the
+  // selected Financial Period whenever the period changes, but the user can then pick a different
+  // date themselves before it's used/saved - so this is a settable override on top of the computed
+  // default, not a purely derived value.
+  private processingDateOverride = signal<Date | null>(null);
+  processingDate = computed(() => this.processingDateOverride() ?? this.computeProcessingDate(this.selectedPeriod()));
 
   constructor(private http: HttpClient) {}
 
@@ -96,6 +101,14 @@ export class SettingsService {
 
   selectPeriod(periodId: number): void {
     this.periodId.set(periodId);
+    // Match desktop's FillDefaultDate() re-running on period change - drop any manual override so
+    // the date picker shows the new period's computed default again, still user-editable from there.
+    this.processingDateOverride.set(null);
+  }
+
+  selectProcessingDate(date: Date | string): void {
+    const parsed = this.parseDate(date);
+    if (parsed) this.processingDateOverride.set(parsed);
   }
 
   save(): void {
@@ -106,7 +119,8 @@ export class SettingsService {
       settingsCode: this.settingsCode,
       companyCode: this.companyCode(),
       branchCode: this.branchCode(),
-      periodId: this.periodId()
+      periodId: this.periodId(),
+      processingDate: this.processingDate()
     }).subscribe({
       next: () => this.saving.set(false),
       error: (err) => {
@@ -140,8 +154,19 @@ export class SettingsService {
     return stored ?? to ?? today;
   }
 
+  // usp_GetFinancialPeriod returns FromDate/ToDate/ProcessingDate via CONVERT(..., 103) - SQL
+  // Server's dd/MM/yyyy style (e.g. "10/09/2026" for 10 Sep 2026). JavaScript's Date constructor
+  // treats a slash-separated date string as MM/DD/YYYY regardless of what it actually represents,
+  // so new Date("10/09/2026") silently comes out as 9 October instead of 10 September. This parses
+  // that exact dd/MM/yyyy shape explicitly instead of handing it to the ambiguous Date constructor.
   private parseDate(value: unknown): Date | null {
     if (value === null || value === undefined || value === '') return null;
+    const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(value).trim());
+    if (match) {
+      const [, dd, mm, yyyy] = match;
+      const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
     const date = new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date;
   }

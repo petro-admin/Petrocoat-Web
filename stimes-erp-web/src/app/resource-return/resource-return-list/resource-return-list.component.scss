@@ -1,0 +1,204 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  flex: 0 0 auto;
+
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+
+  input, button {
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  input { min-width: 240px; }
+
+  button {
+    cursor: pointer;
+    transition: background .15s ease;
+    &:hover { background: var(--surface-sunken); }
+    &.primary { background: var(--accent); color: #fff; border-color: transparent; &:hover { background: var(--accent-dark); } }
+  }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+// flex:1 instead of a fixed max-height - the card grows to fill whatever vertical space
+// .page actually has, so a short list's card reaches the bottom of the screen instead of
+// leaving a big flat gap of plain background below it.
+.table-scroll {
+  overflow: auto;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+tbody tr { cursor: pointer; transition: background .1s ease; }
+tbody tr:hover td { background: var(--surface-muted); }
+
+.muted { color: var(--ink-faint); font-size: 12px; }
+
+// Matches desktop's gvSide BranchName grouping.
+.group-row {
+  cursor: pointer;
+  font-weight: 600;
+
+  td { border-bottom: 1px solid var(--border); white-space: normal; }
+
+  .chevron {
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+    &.collapsed { transform: rotate(-90deg); }
+  }
+}
+
+.branch-group {
+  td { background: var(--accent-light); border-left: 4px solid var(--accent); color: var(--accent); }
+}
+
+.sono-group {
+  td { background: #f8f6f7; border-left: 4px solid #a8577a; padding-left: 28px; color: #a8577a; }
+}
+
+.data-row {
+  &:hover td { background: var(--accent-light); color: var(--accent-dark); }
+  &:nth-child(odd) td { background: var(--surface-muted); }
+  &:hover:nth-child(odd) td { background: var(--accent-light); color: var(--accent-dark); }
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: #fdf2e0;
+  color: #96650c;
+
+  &.completed { background: #e5f6ea; color: #1a7a3d; }
+}
+
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.print-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  transition: background .15s ease;
+  &:hover { background: var(--surface-sunken); }
+}
+
+.remove-btn {
+  border: none;
+  background: transparent;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  transition: background .15s ease;
+  &:hover { background: #fdecee; }
+  &:disabled { opacity: .5; cursor: default; }
+}
+
+.empty { text-align: center; color: var(--ink-faint); padding: 24px; }

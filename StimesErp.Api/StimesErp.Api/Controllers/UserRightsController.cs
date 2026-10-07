@@ -44,5 +44,16 @@ namespace StimesErp.Api.Controllers
                 approve = Flag("ApproveYesNo")
             });
         }
+
+        // Which top-level module tabs (Payroll/Sales/Inventory/Purchase/Accounts/Admin/General/
+        // Production/Fleet/Estimation/Marketing) this user may see at all - same list the
+        // desktop's MainWindow.CheckMenu() uses to hide/show whole tabs, not per-form CRUD rights.
+        [HttpGet("system-modules")]
+        public IActionResult GetAccessibleSystemModules()
+        {
+            var dt = _service.GetAccessibleSystemCodes(CurrentUserCode);
+            var codes = dt.Rows.Cast<System.Data.DataRow>().Select(r => Convert.ToInt32(r["SystemCode"])).ToList();
+            return Ok(codes);
+        }
     }
 }

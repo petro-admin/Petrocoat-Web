@@ -1,0 +1,244 @@
+:host {
+  display: block;
+  --accent: #6b6f76;
+  --accent-dark: #4a4d53;
+  --accent-light: #eeeff1;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  max-width: 900px;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 4px;
+
+  .kicker { font-size: 11px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  h2 { margin: 0 0 4px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  .subtitle { margin: 0; color: var(--ink-muted); font-size: 12.5px; max-width: 480px; }
+}
+
+.reset-button {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover { background: var(--surface-sunken); }
+}
+
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+
+  h3 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+}
+
+.hint { margin: 0 0 16px; color: var(--ink-muted); font-size: 12.5px; line-height: 1.5; }
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  .half { margin: 0; }
+}
+
+// --- Generic option-card grid (Theme / Sidebar / Corners / Text size) ---
+
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.option-card {
+  position: relative;
+  flex: 1 1 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color .15s ease;
+
+  &:hover { border-color: var(--border-strong); }
+  &.active { border-color: var(--accent); }
+  &.wide { flex-basis: 160px; }
+}
+
+.check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.option-label { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.option-desc { margin-top: -4px; font-size: 10.5px; color: var(--ink-faint); }
+
+.preview {
+  width: 100%;
+  height: 56px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+// Theme preview - a tiny mock "window" with a top bar and two text lines.
+.theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: #ffffff;
+
+  .bar { height: 6px; width: 40%; border-radius: 2px; background: #d0d5dd; }
+  .line { height: 5px; width: 90%; border-radius: 2px; background: #e4e7ec; }
+  .line.short { width: 60%; }
+
+  &.dark {
+    background: #14161a;
+    .bar { background: #4a5160; }
+    .line { background: #2d323c; }
+  }
+
+  &.system {
+    background: linear-gradient(to right, #ffffff 50%, #14161a 50%);
+    .bar { background: #d0d5dd; }
+    .line { background: #e4e7ec; }
+    .line.short { background: #2d323c; }
+  }
+}
+
+// Sidebar preview - narrow rail + wider page body, colored to match each mode.
+.sidebar-preview {
+  display: flex;
+  background: #f4f5f7;
+
+  .rail { width: 30%; }
+  .body { flex: 1; }
+
+  &.dark .rail { background: #263b3b; }
+  &.match .rail { background: #9aa4b2; }
+  &.accent .rail { background: var(--shell-accent, #bf5b3f); }
+}
+
+// Corner preview - a plain swatch whose own radius IS the setting.
+.corner-preview {
+  background: var(--surface-muted);
+
+  &.sharp { border-radius: 2px; }
+  &.default { border-radius: 8px; }
+  &.rounded { border-radius: 18px; }
+}
+
+// Text-size preview - "Aa" rendered at the size that setting actually applies.
+.text-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--ink-muted);
+  background: var(--surface-muted);
+
+  &.compact { font-size: 15px; }
+  &.default { font-size: 19px; }
+  &.large { font-size: 24px; }
+}
+
+// --- Accent colour swatches ---
+
+.accent-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 10px;
+}
+
+.accent-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 44px;
+}
+
+.accent-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+
+  &.active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+
+  .check { position: static; background: transparent; box-shadow: none; color: #fff; font-size: 13px; }
+}
+
+// The "Custom" swatch is a native color <input> wearing a rainbow conic-gradient face until a
+// custom color is actually active (at which point the picked color shows through instead, same
+// as the preset swatches) - clicking it opens the OS/browser's own color picker.
+.custom-swatch {
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  overflow: hidden;
+
+  input[type="color"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.accent-label { text-align: center; font-size: 10px; color: var(--ink-faint); }
+
+@media (max-width: 640px) {
+  .page { padding: 12px 12px 60px; }
+  header { flex-direction: column; }
+  .settings-row { grid-template-columns: 1fr; }
+  .option-card { flex-basis: 100px; }
+}

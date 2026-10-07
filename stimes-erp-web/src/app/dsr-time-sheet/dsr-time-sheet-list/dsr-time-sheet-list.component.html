@@ -1,0 +1,63 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Payroll · Activity</div>
+      <h2>DSR Time Sheet</h2>
+    </div>
+    <div class="filters">
+      <input type="text" placeholder="Search DSR No / Branch" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <select [ngModel]="monthCode()" (ngModelChange)="monthCode.set($event); refresh()">
+        @for (m of months; track m.code) { <option [ngValue]="m.code">{{ m.name }}</option> }
+      </select>
+      <button type="button" (click)="refresh()">Refresh</button>
+      @if (selectedIds().size > 0) {
+        <a class="print-selected-link" routerLink="/dsr-time-sheet/print-multi" [queryParams]="printSelectedQueryParams()" target="dsr-print-multi">
+          🖶 Print Selected ({{ selectedIds().size }})
+        </a>
+      } @else {
+        <button type="button" disabled>🖶 Print Selected (0)</button>
+      }
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New DSR Time Sheet</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="select-column"><input type="checkbox" [checked]="allSelected()" (click)="toggleSelectAll()" /></th>
+          <th>DSR No</th><th>Date</th><th>Branch</th><th>Month</th><th>Created By</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'DSRCode')) {
+          <tr class="data-row" (click)="open(row)">
+            <td class="select-column"><input type="checkbox" [checked]="isSelected(row)" (click)="toggleSelected(row, $event)" /></td>
+            <td class="doc-no">{{ read(row, 'DSRNumber') }}</td>
+            <td>{{ read(row, 'DSRDate') | date:'dd-MM-yyyy' }}</td>
+            <td>{{ read(row, 'BranchName') || '-' }}</td>
+            <td>{{ read(row, 'Month') }}</td>
+            <td>{{ read(row, 'CreatedEmp') || '-' }}</td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="7" class="empty">No DSR Time Sheets found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

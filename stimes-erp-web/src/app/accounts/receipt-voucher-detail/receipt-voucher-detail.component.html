@@ -1,0 +1,228 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Receipt</div>
+      <h2>{{ isNew ? 'New Receipt' : form.get('voucherNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      @if (!isNew) {
+        <button type="button" (click)="print()">Print</button>
+      }
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+    <div class="card">
+      <div class="card-body">
+        <div class="method-radios">
+          <label class="radio-option" [class.active]="receiptMethod() === 'Cash'" [class.disabled]="!isNew">
+            <input type="radio" name="receiptMethod" [checked]="receiptMethod() === 'Cash'" [disabled]="!isNew" (change)="setReceiptMethod('Cash')" />
+            <span>Cash</span>
+          </label>
+          <label class="radio-option" [class.active]="receiptMethod() === 'Bank'" [class.disabled]="!isNew">
+            <input type="radio" name="receiptMethod" [checked]="receiptMethod() === 'Bank'" [disabled]="!isNew" (change)="setReceiptMethod('Bank')" />
+            <span>Bank</span>
+          </label>
+          <label class="radio-option" [class.active]="receiptMethod() === 'Cheque'" [class.disabled]="!isNew">
+            <input type="radio" name="receiptMethod" [checked]="receiptMethod() === 'Cheque'" [disabled]="!isNew" (change)="setReceiptMethod('Cheque')" />
+            <span>Cheque</span>
+          </label>
+        </div>
+        @if (!isNew) {
+          <p class="hint method-locked-hint">Receipt method is locked once saved - delete and re-add this voucher to change it.</p>
+        }
+
+        <div class="field-grid">
+          <div>
+            <label>Voucher No</label>
+            <input formControlName="voucherNo" readonly />
+          </div>
+          <div>
+            <label>Voucher Date <span class="required">*</span></label>
+            <input type="date" formControlName="voucherDate" />
+          </div>
+          <div>
+            <label>{{ receiptMethod() }}</label>
+            <app-filter-select formControlName="receivedInCode" [options]="receivedInOptions()" [placeholder]="'Search ' + receiptMethod()" (valueChange)="onReceivedInChange($event)"></app-filter-select>
+          </div>
+          @if (receivedInBalance()) {
+            <div>
+              <label>Balance</label>
+              <div class="balance-display" [class.credit]="receivedInBalance()!.drCr === 'Cr'">
+                {{ receivedInBalance()!.balance }} {{ receivedInBalance()!.drCr }}
+              </div>
+            </div>
+          }
+          <div>
+            <label>Ledger Type</label>
+            <select [ngModel]="ledgerType()" [ngModelOptions]="{standalone: true}" (ngModelChange)="ledgerType.set($event)">
+              @for (t of ledgerTypes; track t) { <option [value]="t">{{ t }}</option> }
+            </select>
+          </div>
+          @if (ledgerType() === 'Customer') {
+            <div>
+              <label>Customer</label>
+              <app-filter-select formControlName="customerPicker" [options]="customerOptions()" placeholder="Pick a customer to receive against their invoices" (valueChange)="onCustomerPicked($event)"></app-filter-select>
+            </div>
+          }
+          @if (receiptMethod() === 'Cheque') {
+            <div>
+              <label>Cheque No</label>
+              <input formControlName="chequeNo" placeholder="Cheque No" />
+            </div>
+            <div>
+              <label>Cheque Date</label>
+              <input type="date" formControlName="chequeDate" />
+            </div>
+          }
+          <div>
+            <label>Document Upload</label>
+            <label class="doc-upload-box" [class.uploading]="uploadingDocument()">
+              <input type="file" accept="image/*,application/pdf" (change)="onDocumentSelected($event)" [disabled]="uploadingDocument()" hidden />
+              <span>{{ uploadingDocument() ? 'Uploading...' : 'Browse, drag document, or take a photo' }}</span>
+            </label>
+          </div>
+        </div>
+
+        @if (documents().length > 0) {
+          <div class="doc-chip-list">
+            @for (doc of documents(); track doc.filePath; let i = $index) {
+              <span class="doc-chip">
+                <a (click)="viewDocument(doc)">📄 {{ doc.fileName }}</a>
+                <button type="button" (click)="removeDocument(i)">✕</button>
+              </span>
+            }
+          </div>
+        }
+
+        <label>Narration</label>
+        <textarea formControlName="narration" rows="2" placeholder="Overall narration for this receipt"></textarea>
+      </div>
+    </div>
+
+    @if (customerLineIndex !== null && hasOpenBills(customerLineIndex)) {
+      <div class="card">
+        <div class="card-title">Account Invoice Details</div>
+        <div class="table-scroll">
+          <table class="bills-table standalone-bills-table">
+            <colgroup>
+              <col style="width: 32px" />
+              <col style="width: 160px" />
+              <col style="width: 120px" />
+              <col style="width: 140px" />
+              <col style="width: 140px" />
+              <col style="width: 150px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th><input type="checkbox" [checked]="allTickedForLine(customerLineIndex)" (change)="toggleAllForLine(customerLineIndex)" title="Select all" /></th>
+                <th>Invoice No</th><th>Date</th><th class="amount">Total</th><th class="amount">Outstanding</th><th class="amount">Allocate</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (invoice of openBillsFor(customerLineIndex); track read(invoice, 'Code')) {
+                <tr>
+                  <td><input type="checkbox" [checked]="isAllocated(customerLineIndex, invoice)" (change)="toggleAllocation(customerLineIndex, invoice)" /></td>
+                  <td>{{ read(invoice, 'InvoiceNo') }}</td>
+                  <td>{{ read(invoice, 'InvoiceDate') | date:'dd-MM-yyyy' }}</td>
+                  <td class="amount">{{ read(invoice, 'TotalAmount') }}</td>
+                  <td class="amount">{{ read(invoice, 'Outstanding') }}</td>
+                  <td class="amount">
+                    @if (isAllocated(customerLineIndex, invoice)) {
+                      <input type="number" class="amount-input" [value]="allocationAmount(customerLineIndex, invoice)" (input)="setAllocationAmount(customerLineIndex, invoice, $any($event.target).value)" />
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <div class="card">
+      <div class="card-title">
+        Account Details
+      </div>
+      <div class="table-scroll" formArrayName="lines">
+        <table>
+          <thead>
+            <tr>
+              <th>Sl No</th><th>Account</th>
+              @if (ledgerType() === 'General Ledger') { <th>Cost Center</th> }
+              <th>Receipt</th><th>Narration</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of lines.controls; track $index; let i = $index) {
+              <tr [formGroupName]="i">
+                <td class="sl-no">{{ i + 1 }}</td>
+                <td class="head-cell">
+                  @if (ledgerType() === 'General Ledger') {
+                    <app-filter-select formControlName="accountHeadCode" [options]="filteredHeadOptions()" placeholder="Select account" (valueChange)="onReceivedFromChange(i, $event)"></app-filter-select>
+                  } @else {
+                    <div class="account-readonly">{{ accountHeadName(line.get('accountHeadCode')?.value) }}</div>
+                  }
+                </td>
+                @if (ledgerType() === 'General Ledger') {
+                  <td class="head-cell">
+                    <app-filter-select formControlName="costCenterCode" [options]="costCenterOptions()" placeholder="-None-"></app-filter-select>
+                  </td>
+                }
+                <td class="amount-cell">
+                  @if (ledgerType() !== 'General Ledger') {
+                    <!-- Driven entirely by the ticked invoices in Account Invoice Details above -
+                         plain read-only display, not click-to-edit. -->
+                    <div class="amount-display readonly">{{ currencyShortName() }} {{ formatAmount(line.get('amount')?.value) }}</div>
+                  } @else if (editingAmountIndex() === i) {
+                    <input type="number" formControlName="amount" class="amount-input" autofocus (blur)="editingAmountIndex.set(null)" />
+                  } @else {
+                    <div class="amount-display" tabindex="0" (click)="editingAmountIndex.set(i)" (focus)="editingAmountIndex.set(i)">
+                      {{ currencyShortName() }} {{ formatAmount(line.get('amount')?.value) }}
+                    </div>
+                  }
+                </td>
+                <td><input formControlName="narration" /></td>
+                <td>
+                  @if (ledgerType() === 'General Ledger') {
+                    <button type="button" class="remove-btn" (click)="removeLine(i)">✕</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (ledgerType() === 'General Ledger') {
+        <button type="button" class="add-line-btn" (click)="addLine()">+ Add Line</button>
+      }
+
+      <div class="grand-total-row">
+        <label>Grand Total</label>
+        <div class="grand-total-box">{{ totalAmount() }}</div>
+      </div>
+    </div>
+
+    @if (!isNew && existingAllocations().length > 0) {
+      <div class="card">
+        <div class="card-title">Allocated Against</div>
+        <div class="card-body">
+          @for (alloc of existingAllocations(); track read(alloc, 'Code')) {
+            <div class="allocation-row">{{ read(alloc, 'InvoiceNo') }} — {{ read(alloc, 'AllocatedAmount') }}</div>
+          }
+        </div>
+      </div>
+    }
+  </form>
+  }
+</div>

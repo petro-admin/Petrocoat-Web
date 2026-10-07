@@ -71,6 +71,10 @@ namespace StimesErp.Api.Models
         public int EstSlNo { get; set; }
         public string Scope { get; set; } = string.Empty;
         public int Division { get; set; }
+
+        /// <summary>Persisted separately via usp_SetDailySiteScopeOfWorkRemarks - the shared
+        /// usp_ManageDailySite/its TVP are desktop-shared and untouched.</summary>
+        public string Remarks { get; set; } = string.Empty;
     }
 
     // Matches gvMaterial columns in DailySite.xaml
@@ -121,6 +125,7 @@ namespace StimesErp.Api.Models
         public decimal TotalConsumablesUsed { get; set; }
         public string BgColor { get; set; } = string.Empty;
         public int? BaseUnitCode { get; set; }
+        public decimal PackSize { get; set; }
 
     }
 
@@ -166,6 +171,22 @@ namespace StimesErp.Api.Models
         public decimal ExistingHrs { get; set; }
         public decimal ExistingNormalHrs { get; set; }
         public string ExistingDailySiteNo { get; set; } = string.Empty;
+
+        // From LabourAttendance's face-recognition Check In/Check Out for this employee on this
+        // DocDate against this Job/Sales Order (see LabourAttendanceService) - lets the web app
+        // auto-fill Hrs from actual attendance instead of the driver typing it in by hand.
+        public DateTime? AttendanceCheckIn { get; set; }
+        public DateTime? AttendanceCheckOut { get; set; }
+        public decimal? AttendanceHrs { get; set; }
+    }
+
+    /// <summary>Result of checking whether a Daily Site record already exists for a given
+    /// Sales Order + Date combination, so the form can warn before creating a duplicate.</summary>
+    public class JobDateExistCheck
+    {
+        public bool Exists { get; set; }
+        public int Code { get; set; }
+        public string DocNo { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -190,6 +211,15 @@ namespace StimesErp.Api.Models
         public decimal EstRateOfUsage { get; set; } = 1;
         public decimal TotalMaterialsUsedPrev { get; set; }
         public decimal MaterialReceivedTodayAtSitePrev { get; set; }
+    }
+
+    // Result of usp_GetDailySiteMaterialPrevTotalUsed
+    public class MaterialPrevTotalUsedResult
+    {
+        public decimal TotalUsed { get; set; }
+        public decimal Area { get; set; }
+        public decimal RateOfApplication { get; set; }
+        public int SurfacePreparationCode { get; set; }
     }
 
     /// <summary>

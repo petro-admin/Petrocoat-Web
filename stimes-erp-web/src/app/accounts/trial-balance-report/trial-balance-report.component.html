@@ -1,0 +1,47 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Trial Balance @if (currencySymbol()) { <span class="currency-badge">{{ currencySymbol() }}</span> }</h2>
+    <div class="filters">
+      <label>As of <input type="date" [ngModel]="asOfDate()" (ngModelChange)="asOfDate.set($event)" /></label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="back()">Back</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Account Head</th><th>Debit</th><th>Credit</th></tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.key) {
+          <tr class="group-row"><td colspan="3">{{ group.label }}</td></tr>
+          @for (row of group.rows; track read(row, 'Code')) {
+            <tr>
+              <td class="head-cell">{{ read(row, 'HeadName') }}</td>
+              <td class="amt-cell">{{ debitAmount(row) || '-' }}</td>
+              <td class="amt-cell">{{ creditAmount(row) || '-' }}</td>
+            </tr>
+          }
+        }
+        @if (groups().length === 0 && !loading()) {
+          <tr><td colspan="3" class="empty">No Account Heads found</td></tr>
+        }
+      </tbody>
+      @if (groups().length > 0) {
+        <tfoot>
+          <tr><td class="total-label">Total</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalDebit() }}</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalCredit() }}</td></tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+  }
+</div>

@@ -1,0 +1,286 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <div class="topbar">
+    <div>
+      <h2>{{ isNew ? 'New Vehicle Service / Repair' : 'Edit Vehicle Service / Repair' }}</h2>
+      <span class="docno" *ngIf="form.get('docNo')?.value as dn">{{ dn }}</span>
+    </div>
+    <div class="topbar-actions">
+      @if (!isNew) {
+        <button class="secondary" type="button" (click)="print()">Print</button>
+        @if (rights().delete) {
+          <button class="danger" type="button" (click)="deleteRecord()">Delete</button>
+        }
+      }
+      <button class="secondary" type="button" (click)="cancel()">Cancel</button>
+      <button class="primary" type="button" [disabled]="saving() || !canSave()"
+              [title]="!canSave() ? (isApproved() ? 'Approved - cannot be updated' : 'You do not have permission to add') : ''"
+              (click)="save()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" [class.is-loading]="loading()">
+
+    <section class="card">
+      <div class="grid-2">
+        <div class="field">
+          <label>Doc No</label>
+          <input formControlName="docNo" />
+        </div>
+        <div class="field">
+          <label>Date *</label>
+          <app-date-input formControlName="docDate" />
+        </div>
+
+        <div class="field">
+          <label>Vehicle *</label>
+          <select formControlName="vehicleCode" (change)="onVehicleChanged()">
+            <option value="">-Select-</option>
+            @for (v of vehicles(); track $index) {
+              <option [value]="read(v, 'VehicleCode')">{{ read(v, 'RegistrationNo') }}{{ read(v, 'VehicleModel') ? ' (' + read(v, 'VehicleModel') + ')' : '' }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label>Service Type</label>
+          <select formControlName="serviceType">
+            <option value="REPAIR">Repair</option>
+            <option value="SERVICE">Service</option>
+            <option value="BOTH">Repair &amp; Service</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Driver</label>
+          <select formControlName="driverCode">
+            <option value="">-Select-</option>
+            @for (d of drivers(); track $index) {
+              <option [value]="read(d, 'EmployeeCode')">{{ read(d, 'EmpFullName') }}</option>
+            }
+          </select>
+        </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label"><input type="checkbox" formControlName="active" /> Active</label>
+        </div>
+
+        <div class="field">
+          <label>Current KM</label>
+          <input type="number" formControlName="currentKM" />
+        </div>
+        @if (form.get('serviceType')?.value !== 'REPAIR') {
+          <div class="field">
+            <label>Next Service KM</label>
+            <input type="number" formControlName="nextServiceKM" />
+          </div>
+        }
+
+        <div class="field">
+          <label>Service/Repair Date</label>
+          <app-date-input formControlName="serviceDate" />
+        </div>
+        @if (form.get('serviceType')?.value !== 'REPAIR') {
+          <div class="field">
+            <label>Next Service Due Date</label>
+            <app-date-input formControlName="nextServiceDueDate" />
+          </div>
+        }
+
+        <div class="field">
+          <label>Status</label>
+          <select formControlName="statusCode" (change)="onStatusChanged()">
+            <option [value]="1">Open</option>
+            <option [value]="2">Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Completed Date</label>
+          <app-date-input formControlName="completedDate" />
+        </div>
+
+        <div class="field full-width">
+          <label>Remarks</label>
+          <textarea formControlName="remarks" rows="2"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Repair / Service Items</h3>
+        <button type="button" class="add-btn" (click)="addItemRow()">+ Add Row</button>
+      </div>
+      <div class="table-scroll">
+        <table formArrayName="items">
+          <thead>
+            <tr><th>Sl</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th><th>VAT %</th><th>VAT Amount</th><th>Total Amount</th><th>Status</th><th>Remarks</th><th></th></tr>
+          </thead>
+          <tbody>
+            @for (group of itemGroups(); track group.key) {
+              @if (itemGroups().length > 1 || group.label !== 'Other') {
+                <tr class="item-group-row">
+                  <td colspan="11">
+                    <button type="button" class="item-group-toggle" [attr.aria-expanded]="!isItemGroupCollapsed(group.key)" (click)="toggleItemGroup(group.key)">
+                      <span>{{ isItemGroupCollapsed(group.key) ? '+' : '-' }}</span> {{ group.label }}
+                    </button>
+                  </td>
+                </tr>
+              }
+              @if (!isItemGroupCollapsed(group.key) || (itemGroups().length === 1 && group.label === 'Other')) {
+                @for (i of group.indexes; track i) {
+                  @let row = items.at(i);
+                  <tr [formGroupName]="i">
+                    <td>{{ row.get('slNo')?.value }}</td>
+                    <td><input formControlName="description" placeholder="What was repaired/serviced" /></td>
+                    <td><input type="number" formControlName="qty" (input)="recalculateItemRow(i)" /></td>
+                    <td><input type="number" formControlName="rate" (input)="recalculateItemRow(i)" /></td>
+                    <td><input type="number" formControlName="amount" readonly /></td>
+                    <td><input type="number" step="0.01" formControlName="vatPercent" (input)="recalculateItemRow(i)" /></td>
+                    <td><input type="number" formControlName="vatAmount" readonly /></td>
+                    <td><input type="number" [value]="rowTotalAmount(i)" readonly /></td>
+                    <td>
+                      <select formControlName="statusCode">
+                        <option [value]="1">Open</option>
+                        <option [value]="2">Closed</option>
+                      </select>
+                    </td>
+                    <td><input formControlName="remarks" /></td>
+                    <td><button type="button" class="remove-btn" (click)="removeItemRow(row.get('slNo')?.value)">✕</button></td>
+                  </tr>
+                }
+              }
+            }
+            @if (items.length === 0) {
+              <tr><td colspan="11" class="empty">No items yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr><td colspan="4" class="total-label">Total</td><td class="total-value">{{ itemsTotal }}</td><td colspan="6"></td></tr>
+            <tr><td colspan="4" class="total-label">VAT Amount</td><td class="total-value">{{ itemsVatTotal }}</td><td colspan="6"></td></tr>
+            <tr><td colspan="4" class="total-label">Total Amount</td><td class="total-value">{{ itemsTotalWithVat }}</td><td colspan="6"></td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="discount-summary">
+        <div class="field">
+          <label>Discount Amount</label>
+          <input type="number" step="0.01" min="0" formControlName="discountAmount" />
+        </div>
+        <div class="net-amount">
+          <span class="net-label">Net Amount</span>
+          <span class="net-value">{{ netAmount }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="grid-toolbar">
+        <h3>Documents</h3>
+        <button type="button" class="add-btn" (click)="addDocumentRow()">+ Add Row</button>
+      </div>
+      <div class="table-scroll">
+        <table formArrayName="documents">
+          <thead><tr><th>Sl</th><th>Description</th><th>Remarks</th><th>File</th><th></th></tr></thead>
+          <tbody>
+            @for (row of documents.controls; track row; let i = $index) {
+              <tr [formGroupName]="i">
+                <td>{{ row.get('slNo')?.value }}</td>
+                <td><input formControlName="description" /></td>
+                <td><input formControlName="remarks" /></td>
+                <td class="file-cell">
+                  @if (row.get('docUpload')?.value) {
+                    <button type="button" class="link-btn" (click)="viewDocument(i)">
+                      View{{ row.get('originalName')?.value ? ' (' + row.get('originalName')?.value + ')' : '' }}
+                    </button>
+                  }
+                  <label class="upload-btn">
+                    {{ uploadingSlNo() === row.get('slNo')?.value ? 'Uploading...' : (row.get('docUpload')?.value ? 'Replace' : 'Upload') }}
+                    <input type="file" hidden (change)="onDocumentFileSelected(i, $event)" [disabled]="uploadingSlNo() !== null" />
+                  </label>
+                </td>
+                <td><button type="button" class="remove-btn" (click)="removeDocumentRow(row.get('slNo')?.value)">✕</button></td>
+              </tr>
+            }
+            @if (documents.length === 0) {
+              <tr><td colspan="5" class="empty">No documents yet — click "Add Row"</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ APPROVAL ============ -->
+    @if (approvalEnabled()) {
+      <section class="card approval-card">
+        <div class="grid-toolbar">
+          <h3>Approval</h3>
+        </div>
+        @if (isNew) {
+          <p class="hint">Save the record first to use the approval workflow.</p>
+        } @else if (!approvalVisible()) {
+          <p class="hint">Approval is not applicable for you on this record.</p>
+        } @else {
+          <div class="approval-status">
+            <span class="status-badge" [class.status-approved]="read(approvalAction(), 'CurrentStatus') === 'A'"
+                  [class.status-denied]="read(approvalAction(), 'CurrentStatus') === 'D'">
+              {{ read(approvalAction(), 'CurrentStatus') === 'A' ? 'Approved' : read(approvalAction(), 'CurrentStatus') === 'D' ? 'Denied' : 'Pending' }}
+            </span>
+            <button type="button" class="secondary" (click)="toggleLock()" [disabled]="approvalBusy()">
+              {{ read(approvalAction(), 'IsLocked') === 'L' ? 'Unlock' : 'Lock' }}
+            </button>
+          </div>
+
+          <div class="grid-2">
+            <div class="field"><label>Created By</label><input [value]="read(approvalAction(), 'CreatedUser')" readonly /></div>
+            <div class="field"><label>Created On</label><input [value]="read(approvalAction(), 'CreatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Modified By</label><input [value]="read(approvalAction(), 'UpdatedUser')" readonly /></div>
+            <div class="field"><label>Last Modified On</label><input [value]="read(approvalAction(), 'UpdatedDateTime')" readonly /></div>
+            <div class="field"><label>Last Approved By</label><input [value]="read(approvalAction(), 'LastApprovedUser')" readonly /></div>
+            <div class="field"><label>Last Approved On</label><input [value]="read(approvalAction(), 'LastApprovedDateTime')" readonly /></div>
+          </div>
+
+          <div class="field full-width">
+            <label>Comment</label>
+            <textarea rows="2" [value]="approvalComment()" (input)="updateApprovalComment($any($event.target).value)"></textarea>
+          </div>
+
+          <div class="approval-actions">
+            <button type="button" class="approve-btn" [disabled]="approvalBusy() || read(approvalAction(), 'ApproveIsEnable') !== 'Y'" (click)="approve()">Approve</button>
+            <button type="button" class="deny-btn" [disabled]="approvalBusy() || read(approvalAction(), 'DenayIsEnable') !== 'Y'" (click)="deny()">Deny</button>
+            <button type="button" class="secondary" (click)="loadApprovalHistory()">View History</button>
+          </div>
+
+          @if (approvalHistory()) {
+            <div class="history-block">
+              <h4>Action History</h4>
+              @for (table of approvalHistory(); track $index) {
+                <div class="table-scroll">
+                  <table>
+                    @if (table.length > 0) {
+                      <thead><tr>@for (key of objectKeys(table[0]); track key) {<th>{{ key }}</th>}</tr></thead>
+                      <tbody>
+                        @for (row of table; track $index) {
+                          <tr>@for (key of objectKeys(table[0]); track key) {<td>{{ row[key] }}</td>}</tr>
+                        }
+                      </tbody>
+                    }
+                  </table>
+                </div>
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+  </form>
+  }
+</div>

@@ -1,0 +1,66 @@
+<div class="page">
+  <header>
+    <div class="kicker">System Admin › Report</div>
+    <h2>Audit Log</h2>
+  </header>
+
+  <div class="filters">
+    <label>
+      <span>From</span>
+      <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event); load()" />
+    </label>
+    <label>
+      <span>To</span>
+      <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event); load()" />
+    </label>
+    <label>
+      <span>User</span>
+      <select [ngModel]="userCode()" (ngModelChange)="userCode.set($event); load()">
+        <option [ngValue]="0">All users</option>
+        @for (u of users(); track read(u, 'UserCode')) {
+          <option [ngValue]="read(u, 'UserCode')">{{ read(u, 'UserName') }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      <span>Action</span>
+      <select [ngModel]="action()" (ngModelChange)="action.set($event); load()">
+        @for (opt of actionOptions; track opt.value) { <option [ngValue]="opt.value">{{ opt.label }}</option> }
+      </select>
+    </label>
+    <label class="search-field">
+      <span>Search</span>
+      <input type="text" placeholder="Doc no. or module name..." [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" (keyup.enter)="load()" />
+    </label>
+    <button type="button" (click)="load()" [disabled]="loading()">{{ loading() ? 'Loading...' : 'Search' }}</button>
+  </div>
+
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Date / Time</th>
+          <th>User</th>
+          <th>Module</th>
+          <th>Action</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track read(row, 'GenCode')) {
+          <tr>
+            <td class="nowrap">{{ read(row, 'AuditDate') | date:'dd-MM-yyyy HH:mm' }}</td>
+            <td>{{ read(row, 'UserName') }}</td>
+            <td>{{ read(row, 'ModuleName') }}</td>
+            <td><span class="badge" [class]="actionBadgeClass(read(row, 'Action'))">{{ actionLabel(read(row, 'Action')) }}</span></td>
+            <td class="narration">{{ read(row, 'Narration') }}</td>
+          </tr>
+        } @empty {
+          @if (!loading()) { <tr><td colspan="5" class="empty">No audit entries found for this filter.</td></tr> }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

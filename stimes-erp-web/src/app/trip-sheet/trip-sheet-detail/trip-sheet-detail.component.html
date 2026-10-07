@@ -1,0 +1,130 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>{{ isNew ? 'New Trip Sheet' : 'Trip Sheet' }}</h2>
+    <div class="actions">
+      @if (!isNew) {
+        <button type="button" (click)="print()">Print</button>
+      }
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving() || isLocked || (isNew ? !rights().add : !rights().edit)" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+  @if (isLocked) { <p class="hint">This Trip Sheet is Completed and is read-only. Change Status back to Open to edit again.</p> }
+
+  <form [formGroup]="form" class="card">
+    <div class="grid">
+      <label>
+        <span>Doc No</span>
+        <input formControlName="docNo" readonly />
+      </label>
+      <label>
+        <span>Doc Date</span>
+        <app-date-input formControlName="docDate" />
+      </label>
+      <label>
+        <span>Driver</span>
+        <select formControlName="driverCode">
+          <option [ngValue]="null">-Select Driver-</option>
+          @for (d of drivers(); track read(d, 'EmployeeCode')) {
+            <option [ngValue]="toNumber(read(d, 'EmployeeCode'))">{{ read(d, 'EmpFullName') }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Vehicle</span>
+        <select formControlName="vehicleCode">
+          <option [ngValue]="null">-Select Vehicle-</option>
+          @for (v of vehicles(); track read(v, 'VehicleCode')) {
+            <option [ngValue]="toNumber(read(v, 'VehicleCode'))">{{ read(v, 'RegistrationNo') }} ({{ read(v, 'VehicleModel') }})</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <h3>Route Start</h3>
+    <div class="grid">
+      <label>
+        <span>Route Start Time</span>
+        <input type="datetime-local" formControlName="startTime" />
+      </label>
+      <label>
+        <span>Start Odometer (km)</span>
+        <input type="number" formControlName="startOdometer" />
+      </label>
+      <label class="wide">
+        <span>Start Location</span>
+        <input formControlName="startLocation" />
+      </label>
+    </div>
+
+    <h3>Trip Legs</h3>
+    <p class="hint leg-hint">Add one row per stop of the day (Time, Job No, Location, Starting/Ending KM) - matches the driver's paper Daily Trip Sheet exactly.</p>
+    <div class="table-scroll" formArrayName="legs">
+      <table>
+        <thead>
+          <tr>
+            <th>Sl</th><th>Time</th><th>Job No</th><th>Location</th><th>Starting KM</th><th>Ending KM</th><th>Remarks</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (leg of legs.controls; track leg; let i = $index) {
+            <tr [formGroupName]="i">
+              <td>{{ leg.get('slNo')?.value }}</td>
+              <td><input type="time" formControlName="legTime" /></td>
+              <td><input formControlName="jobNo" /></td>
+              <td><input formControlName="location" placeholder="CAMP / SITE" /></td>
+              <td><input type="number" formControlName="startKm" /></td>
+              <td><input type="number" formControlName="endKm" /></td>
+              <td><input formControlName="remarks" /></td>
+              <td><button type="button" class="remove-btn" (click)="removeLegRow(i)">✕</button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="add-row-btn" (click)="addLegRow()">+ Add Leg</button>
+
+    <h3>Camp Reach</h3>
+    <div class="grid">
+      <label>
+        <span>Camp Reach Time</span>
+        <input type="datetime-local" formControlName="endTime" />
+      </label>
+      <label>
+        <span>End Odometer (km)</span>
+        <input type="number" formControlName="endOdometer" />
+      </label>
+      <label class="wide">
+        <span>End Location</span>
+        <input formControlName="endLocation" />
+      </label>
+    </div>
+
+    <div class="grid">
+      <label>
+        <span>Fuel Consumption (Ltr)</span>
+        <input type="number" formControlName="fuelConsumption" />
+      </label>
+      <label>
+        <span>Status</span>
+        <select formControlName="statusCode">
+          <option [ngValue]="0">Open</option>
+          <option [ngValue]="1">Completed</option>
+        </select>
+      </label>
+      <label class="wide">
+        <span>Remarks</span>
+        <textarea formControlName="remarks" rows="2"></textarea>
+      </label>
+    </div>
+  </form>
+  }
+</div>

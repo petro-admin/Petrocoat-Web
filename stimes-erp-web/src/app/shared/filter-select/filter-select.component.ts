@@ -27,7 +27,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
         (keydown)="onKeydown($event)"
         (blur)="onBlur()" />
       @if (isOpen()) {
-        <ul class="options">
+        <ul class="options" [style.top.px]="dropdownTop()" [style.left.px]="dropdownLeft()" [style.min-width.px]="dropdownWidth()">
           @if (allowClear) {
             <li class="option clear" (mousedown)="$event.preventDefault(); selectOption(null)">{{ placeholder }}</li>
           }
@@ -48,6 +48,10 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 })
 export class FilterSelectComponent implements ControlValueAccessor, OnChanges {
   @Input() options: any[] = [];
+  // Mirrors the @Input above into a signal - a plain class property isn't a tracked dependency,
+  // so filteredOptions() (an Angular computed()) would otherwise keep returning its memoized value
+  // forever once options changes, only recomputing whenever searchText happens to change too.
+  private optionsSignal = signal<any[]>([]);
   @Input() valueKey = 'value';
   @Input() labelKey = 'label';
   @Input() placeholder = '-Select-';
@@ -59,24 +63,44 @@ export class FilterSelectComponent implements ControlValueAccessor, OnChanges {
   disabled = signal(false);
   currentValue: any = null;
 
+  // Cards/tables throughout this app clip their contents with overflow:hidden/auto (needed for
+  // rounded corners and horizontal scroll) - an absolutely-positioned dropdown stays trapped inside
+  // that clipping box no matter its z-index. Fixed positioning escapes it (its containing block is
+  // the viewport, since none of those ancestors set transform/filter/will-change), but fixed doesn't
+  // auto-align to the input like absolute does, so the coordinates are computed here instead.
+  dropdownTop = signal(0);
+  dropdownLeft = signal(0);
+  dropdownWidth = signal(0);
+
   private onChange: (value: any) => void = () => {};
   private onTouched: () => void = () => {};
 
   constructor(private elRef: ElementRef<HTMLElement>) {}
 
+  private positionDropdown(): void {
+    const input = this.elRef.nativeElement.querySelector('input');
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    this.dropdownTop.set(rect.bottom + 4);
+    this.dropdownLeft.set(rect.left);
+    this.dropdownWidth.set(rect.width);
+  }
+
   // options often arrives asynchronously (a lookup call still in flight) after writeValue() has
   // already run - re-resolve the display label once the real options land, but only while the
   // user isn't actively typing/browsing the list.
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['options'] && !this.isOpen()) {
-      this.searchText.set(this.labelForValue(this.currentValue));
+    if (changes['options']) {
+      this.optionsSignal.set(this.options);
+      if (!this.isOpen()) this.searchText.set(this.labelForValue(this.currentValue));
     }
   }
 
   filteredOptions = computed(() => {
+    const options = this.optionsSignal();
     const term = this.searchText().trim().toLowerCase();
-    if (!term) return this.options;
-    return this.options.filter(opt => String(this.labelOf(opt)).toLowerCase().includes(term));
+    if (!term) return options;
+    return options.filter(opt => String(this.labelOf(opt)).toLowerCase().includes(term));
   });
 
   valueOf(opt: any): any {
@@ -95,12 +119,14 @@ export class FilterSelectComponent implements ControlValueAccessor, OnChanges {
 
   onFocus(event: FocusEvent): void {
     this.isOpen.set(true);
+    this.positionDropdown();
     (event.target as HTMLInputElement).select();
   }
 
   onInput(event: Event): void {
     this.searchText.set((event.target as HTMLInputElement).value);
     this.isOpen.set(true);
+    this.positionDropdown();
   }
 
   onKeydown(event: KeyboardEvent): void {
@@ -108,6 +134,12 @@ export class FilterSelectComponent implements ControlValueAccessor, OnChanges {
       (event.target as HTMLInputElement).blur();
     } else if (event.key === 'Enter') {
       event.preventDefault();
+      // Pressing Enter on an emptied box used to fall through to "select the first option in the
+      // list" - indistinguishable from the user wanting to clear it back to blank.
+      if (this.allowClear && this.searchText().trim() === '') {
+        this.selectOption(null);
+        return;
+      }
       const first = this.filteredOptions()[0];
       if (first) this.selectOption(first);
     }
@@ -128,7 +160,14 @@ export class FilterSelectComponent implements ControlValueAccessor, OnChanges {
     // still registers as a click before the list closes.
     setTimeout(() => {
       this.isOpen.set(false);
-      this.searchText.set(this.labelForValue(this.currentValue));
+      // Backspacing the text to empty and clicking away used to just snap back to the old
+      // selection's label, with no way to actually clear the value short of reopening the list and
+      // clicking the explicit clear entry - treat an emptied box as "clear" too.
+      if (this.allowClear && this.searchText().trim() === '') {
+        this.selectOption(null);
+      } else {
+        this.searchText.set(this.labelForValue(this.currentValue));
+      }
       this.onTouched();
     }, 150);
   }

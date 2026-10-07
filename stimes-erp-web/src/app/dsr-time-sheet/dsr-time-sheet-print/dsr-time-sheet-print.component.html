@@ -1,0 +1,115 @@
+<div class="print-page">
+  <div class="toolbar no-print">
+    <span class="toolbar-hint">"Download PDF" opens the print dialog — choose "Save as PDF" as the destination</span>
+    <button type="button" (click)="print()">Download PDF</button>
+    <button type="button" class="secondary" (click)="downloadExcel()">Download Excel</button>
+  </div>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  @if (!loading() && !errorMessage()) {
+    <h1 class="report-title">DSR TIME SHEET</h1>
+
+    <!-- ============ HEADER INFO ============ -->
+    <table class="info-table">
+      <tr>
+        <td class="label">DSR No :</td><td>{{ rowValue(header(), 'DSRNumber') }}</td>
+        <td class="label">Date :</td><td>{{ rowValue(header(), 'DSRDate') | date:'dd-MM-yyyy' }}</td>
+      </tr>
+      <tr>
+        <td class="label">Branch :</td><td>{{ rowValue(header(), 'BranchName') }}</td>
+        <td class="label">Created By :</td><td>{{ rowValue(header(), 'CreatedEmp') }}</td>
+      </tr>
+      <tr>
+        <td class="label">Remarks :</td><td colspan="3">{{ rowValue(header(), 'Remarks') }}</td>
+      </tr>
+    </table>
+
+    <!-- ============ DSR TIME SHEET DETAILS ============ -->
+    <h2 class="section-title">DSR Time Sheet Details</h2>
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>S.No</th><th>Employee</th><th>Job No</th><th>Supervisor</th><th>Status</th>
+            <th>Actual Hrs</th><th>Basic</th><th>OT1</th><th>OT2</th><th>Paid</th><th>Idle</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (group of groupedLines(); track group.category) {
+            <tr class="category-row"><td colspan="11">{{ group.category }}</td></tr>
+            @for (row of group.rows; track $index; let i = $index) {
+              <tr [class]="rowClass(rowValue(row, 'AttStatusCode'))">
+                <td>{{ rowValue(row, 'SlNo') }}</td>
+                <td class="text-left">{{ rowValue(row, 'EmpFullName') }}</td>
+                <td class="text-left">{{ rowValue(row, 'SoNo') }}</td>
+                <td class="text-left">{{ rowValue(row, 'Supervisor') }}</td>
+                <td class="text-left">{{ statusLabel(rowValue(row, 'AttStatusCode')) }}</td>
+                <td>{{ rowValue(row, 'ActualHrs') }}</td>
+                <td>{{ rowValue(row, 'Basic') }}</td>
+                <td>{{ rowValue(row, 'OT1') }}</td>
+                <td>{{ rowValue(row, 'OT2') }}</td>
+                <td>{{ rowValue(row, 'Paid') }}</td>
+                <td>{{ rowValue(row, 'IDLE') }}</td>
+              </tr>
+            }
+          }
+          @if (lines().length === 0) {
+            <tr><td colspan="11" class="empty">No rows</td></tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr class="totals-row">
+            <td colspan="5">Total</td>
+            <td>{{ totals().actualHrs }}</td>
+            <td>{{ totals().basic }}</td>
+            <td>{{ totals().ot1 }}</td>
+            <td>{{ totals().ot2 }}</td>
+            <td>{{ totals().paid }}</td>
+            <td>{{ totals().idle }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ============ JOB-WISE SUMMARY ============ -->
+    <h2 class="section-title">Job-wise Summary</h2>
+    <div class="table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr><th>S.No</th><th>Job No</th><th>Actual Hrs</th><th>Basic</th><th>OT</th><th>Paid</th><th>Idle</th></tr>
+        </thead>
+        <tbody>
+          @for (row of jobSummary(); track $index) {
+            <tr>
+              <td>{{ rowValue(row, 'SlNo') }}</td>
+              <td class="text-left">{{ rowValue(row, 'SoNo') }}</td>
+              <td>{{ rowValue(row, 'ActualHrs') }}</td>
+              <td>{{ rowValue(row, 'Basic') }}</td>
+              <td>{{ rowValue(row, 'OT') }}</td>
+              <td>{{ rowValue(row, 'Paid') }}</td>
+              <td>{{ rowValue(row, 'Idle') }}</td>
+            </tr>
+          }
+          @if (jobSummary().length === 0) {
+            <tr><td colspan="7" class="empty">No job summary</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="signature-block">
+      <div class="signature-cell">
+        <div class="signature-role">PREPARED BY</div>
+        <div class="signature-line">{{ preparedByName() || 'NAME' }}</div>
+        <div class="signature-line">SIGNATURE</div>
+      </div>
+      <div class="signature-cell">
+        <div class="signature-role">APPROVED BY</div>
+        <div class="signature-line">{{ approvedByName() || 'NAME' }}</div>
+        <div class="signature-line">SIGNATURE</div>
+      </div>
+    </div>
+  }
+</div>

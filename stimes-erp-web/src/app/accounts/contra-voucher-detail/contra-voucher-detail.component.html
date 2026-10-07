@@ -1,0 +1,58 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Contra</div>
+      <h2>{{ isNew ? 'New Contra' : form.get('voucherNo')?.value }}</h2>
+    </div>
+    <div class="actions">
+      @if (!isNew) {
+        <button type="button" (click)="print()">Print</button>
+      }
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+    <div class="card">
+      <div class="card-body">
+        <div class="field-grid">
+          <div>
+            <label>Voucher No</label>
+            <input formControlName="voucherNo" readonly />
+          </div>
+          <div>
+            <label>Voucher Date</label>
+            <input type="date" formControlName="voucherDate" />
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div>
+            <label>Transfer From</label>
+            <app-filter-select formControlName="fromCode" [options]="bankCashOptions()" placeholder="Select Bank / Cash account"></app-filter-select>
+          </div>
+          <div>
+            <label>Transfer To</label>
+            <app-filter-select formControlName="toCode" [options]="bankCashOptions()" placeholder="Select Bank / Cash account"></app-filter-select>
+          </div>
+        </div>
+
+        <label>Amount</label>
+        <input type="number" formControlName="amount" class="amount-input" />
+
+        <label>Narration</label>
+        <textarea formControlName="narration" rows="2" placeholder="Overall narration for this transfer"></textarea>
+      </div>
+    </div>
+  </form>
+  }
+</div>

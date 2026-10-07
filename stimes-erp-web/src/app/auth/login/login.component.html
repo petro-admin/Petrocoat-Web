@@ -14,6 +14,21 @@
         <span class="brand-tagline">BUILDING &nbsp;|&nbsp; PROTECTING &nbsp;|&nbsp; EXCELLING</span>
       </div>
 
+      @if (faceLoginOpen()) {
+        <div class="face-login-panel">
+          <video #faceVideo class="face-video" autoplay playsinline muted></video>
+          <p class="face-status">{{ faceStatus() }}</p>
+          <button type="button" class="face-cancel-btn" (click)="stopFaceLogin()">Cancel</button>
+        </div>
+        <div class="divider"><span>or use your password</span></div>
+      } @else {
+        <button type="button" class="fingerprint-btn" (click)="startFaceLogin()">
+          <span class="fingerprint-icon">🙂</span>
+          Login with Face
+        </button>
+        <div class="divider"><span>or use your password</span></div>
+      }
+
       <form class="login-card" [formGroup]="form" (ngSubmit)="submit()">
         <h1>Login</h1>
         <p class="subtitle">Enter your credentials to access the ERP</p>

@@ -9,6 +9,7 @@ export interface LoginResponse {
   userCode: number;
   userName: string;
   uCatCode: number;
+  empCode: number;
 }
 
 const TOKEN_KEY = 'stimes_erp_token';
@@ -23,13 +24,15 @@ export class AuthService {
   login(username: string, password: string): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, { username, password })
-      .pipe(
-        tap((res) => {
-          localStorage.setItem(TOKEN_KEY, res.token);
-          localStorage.setItem(USER_KEY, JSON.stringify(res));
-          this.currentUser.set(res);
-        })
-      );
+      .pipe(tap((res) => this.setSession(res)));
+  }
+
+  // Used by face login, which gets its LoginResponse from FaceLoginService rather than this
+  // service's own HTTP call, but needs to persist the session the exact same way.
+  setSession(res: LoginResponse): void {
+    localStorage.setItem(TOKEN_KEY, res.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(res));
+    this.currentUser.set(res);
   }
 
   logout(): void {

@@ -37,7 +37,7 @@ namespace StimesErp.Api.Controllers
         [HttpPost("my-settings")]
         public IActionResult SaveMySettings([FromBody] SaveUserSettingsRequest request)
         {
-            if (!_service.IsDateInFinancialPeriod(request.PeriodId, DateTime.Now))
+            if (!_service.IsDateInFinancialPeriod(request.PeriodId, request.ProcessingDate))
                 return BadRequest(new { message = "The Processing date should be in financial period." });
 
             var result = _service.SaveUserSettings(request.SettingsCode, CurrentUserCode, request.CompanyCode, request.BranchCode, request.PeriodId);

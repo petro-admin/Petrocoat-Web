@@ -1,0 +1,63 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Balance Sheet @if (currencySymbol()) { <span class="currency-badge">{{ currencySymbol() }}</span> }</h2>
+    <div class="filters">
+      <label>As of <input type="date" [ngModel]="asOfDate()" (ngModelChange)="asOfDate.set($event)" /></label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="back()">Back</button>
+      <span class="balance-tag" [class.ok]="isBalanced()" [class.bad]="!isBalanced()">
+        {{ isBalanced() ? '✓ Balanced' : '✗ Not Balanced (' + (totalAssets() - totalLiabilities()) + ')' }}
+      </span>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="bs-columns">
+    <div class="bs-side">
+      <div class="side-title">Liabilities &amp; Equity</div>
+      <div class="table-scroll">
+        <table>
+          <tbody>
+            @for (group of liabilityGroups(); track group.key) {
+              <tr class="group-row"><td>{{ group.label }}</td><td class="amt-cell">{{ group.total }}</td></tr>
+              @for (row of group.rows; track read(row, 'Code')) {
+                <tr><td class="head-cell">{{ read(row, 'HeadName') }}</td><td class="amt-cell">{{ -toNumber(read(row, 'Balance')) }}</td></tr>
+              }
+            }
+            <tr class="group-row"><td>Profit &amp; Loss A/c (Current Year)</td><td class="amt-cell">{{ netProfitForYear() }}</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td class="total-label">Total</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalLiabilities() }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="bs-side">
+      <div class="side-title">Assets</div>
+      <div class="table-scroll">
+        <table>
+          <tbody>
+            @for (group of assetGroups(); track group.key) {
+              <tr class="group-row"><td>{{ group.label }}</td><td class="amt-cell">{{ group.total }}</td></tr>
+              @for (row of group.rows; track read(row, 'Code')) {
+                <tr><td class="head-cell">{{ read(row, 'HeadName') }}</td><td class="amt-cell">{{ toNumber(read(row, 'Balance')) }}</td></tr>
+              }
+            }
+          </tbody>
+          <tfoot>
+            <tr><td class="total-label">Total</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalAssets() }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  }
+</div>

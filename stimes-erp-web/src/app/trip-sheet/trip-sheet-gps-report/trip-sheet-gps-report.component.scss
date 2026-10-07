@@ -1,0 +1,172 @@
+:host {
+  display: block;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+.page {
+  width: 100%;
+  padding: 18px clamp(14px, 3vw, 32px) 60px;
+  background: var(--surface-sunken);
+  min-height: 100%;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+
+  h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .lookup-filter { min-width: 170px; }
+
+  input, button {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  button {
+    cursor: pointer;
+    transition: background .15s ease;
+    &:hover { background: var(--surface-sunken); }
+    &.primary { background: var(--accent); color: #fff; border-color: transparent; &:hover { background: var(--accent-dark); } }
+  }
+}
+
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.note { font-size: 12px; font-style: italic; margin-bottom: 12px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.error {
+  color: #9f1c2e;
+  background: #fdecee;
+  border: 1px solid #f6c6cc;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.table-scroll {
+  overflow: auto;
+  max-height: 75vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; white-space: nowrap; }
+
+.group-row {
+  cursor: pointer;
+  font-weight: 700;
+
+  td { background: var(--accent-light); color: var(--accent-dark); border-left: 4px solid var(--accent); white-space: normal; }
+
+  .chevron {
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+    &.collapsed { transform: rotate(-90deg); }
+  }
+
+  .group-total { float: right; font-weight: 600; font-size: 12px; color: var(--ink-muted); }
+}
+
+a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+.empty { text-align: center; color: var(--ink-faint); padding: 24px; }
+
+tfoot td {
+  border-bottom: none;
+  border-top: 2px solid var(--border-strong);
+  padding: 10px 12px;
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+}
+.total-label { text-align: right; font-weight: 700; color: var(--ink-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.total-value { font-weight: 700; color: var(--accent); font-size: 14px; }
+
+.print-only { display: none; }
+
+@media print {
+  :host { background: #fff; }
+  .page { background: #fff; padding: 0; }
+  .filters, .note { display: none !important; }
+  header { box-shadow: none; border: none; padding: 0 0 8px; }
+  .print-only { display: block; color: var(--ink-muted); font-size: 12.5px; margin: 0 0 10px; }
+  .table-scroll { overflow: visible; max-height: none; border: none; }
+  th { position: static; }
+
+  // The on-screen table's min-width:1100px (needed for the horizontal-scroll layout) forces the
+  // table wider than a printed page, cropping the right-most columns (Start/End Odometer,
+  // Distance) clean off - fixed width + shrink-to-fit + wrapping long address text instead of a
+  // fixed min-width, and landscape orientation since this report has 9 columns.
+  table { min-width: 0; width: 100%; table-layout: fixed; font-size: 10px; }
+  th, td { white-space: normal; overflow-wrap: break-word; padding: 5px 6px; }
+
+  @page { size: landscape; margin: 1cm; }
+}

@@ -4,20 +4,30 @@ import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { DashboardBranch, DashboardDepartment, DashboardKpis, DashboardService } from '../services/dashboard.service';
 import { AuthService } from '../services/auth.service';
+import { DateInputComponent } from '../../shared/date-input/date-input.component';
 
 const ADMIN_USER_CATEGORY_CODE = 1;
 const RETROSYS_BRANCH_CODE = 6;
 
 Chart.register(...registerables);
 
+// Formats a Date using its LOCAL year/month/day, not toISOString() (which converts to UTC first).
+// For any timezone ahead of UTC (e.g. UAE, GMT+4) that conversion rolls local midnight back into
+// the previous day, so new Date(year, month, 1) - meant to be "the 1st of this month" - rendered
+// as the last day of the PREVIOUS month instead, and the "last day of this month" default
+// similarly came out one day short. Building the string from the Date's own local fields avoids
+// any UTC round-trip entirely.
 function toIsoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 @Component({
   selector: 'app-erp-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DateInputComponent],
   templateUrl: './erp-dashboard.component.html',
   styleUrl: './erp-dashboard.component.scss'
 })
@@ -30,8 +40,10 @@ export class ErpDashboardComponent implements OnInit {
   error = signal<string | null>(null);
   kpis = signal<DashboardKpis | null>(null);
 
+  // Defaults to the full current calendar month (1st through its last day), matching Audit Log
+  // and Material Expiry Report's default date range.
   fromDate = signal(toIsoDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
-  toDate = signal(toIsoDate(new Date()));
+  toDate = signal(toIsoDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
 
   branches = signal<DashboardBranch[]>([]);
   selectedBranchCodes = signal<Set<number>>(new Set());

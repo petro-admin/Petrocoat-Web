@@ -1,0 +1,69 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <h2>Profit &amp; Loss @if (currencySymbol()) { <span class="currency-badge">{{ currencySymbol() }}</span> }</h2>
+    <div class="filters">
+      <label>From <input type="date" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" /></label>
+      <label>To <input type="date" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" /></label>
+      <button type="button" class="primary" (click)="load()">Load</button>
+      <button type="button" (click)="back()">Back</button>
+      <span class="result-tag" [class.profit]="netResult() >= 0" [class.loss]="netResult() < 0">
+        {{ netResult() >= 0 ? 'Net Profit: ' : 'Net Loss: ' }}{{ currencySymbol() }} {{ (netResult() < 0 ? -netResult() : netResult()) }}
+      </span>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="pl-columns">
+    <div class="pl-side">
+      <div class="side-title">Expenses</div>
+      <div class="table-scroll">
+        <table>
+          <tbody>
+            @for (group of expenseGroups(); track group.key) {
+              <tr class="group-row"><td>{{ group.label }}</td><td class="amt-cell">{{ group.total }}</td></tr>
+              @for (row of group.rows; track read(row, 'Code')) {
+                <tr><td class="head-cell">{{ read(row, 'HeadName') }}</td><td class="amt-cell">{{ -toNumber(read(row, 'NetAmount')) }}</td></tr>
+              }
+            }
+            @if (netResult() >= 0) {
+              <tr class="group-row net-row"><td>Net Profit c/o</td><td class="amt-cell">{{ netResult() }}</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr><td class="total-label">Total</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalExpense() + (netResult() >= 0 ? netResult() : 0) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="pl-side">
+      <div class="side-title">Income</div>
+      <div class="table-scroll">
+        <table>
+          <tbody>
+            @for (group of incomeGroups(); track group.key) {
+              <tr class="group-row"><td>{{ group.label }}</td><td class="amt-cell">{{ group.total }}</td></tr>
+              @for (row of group.rows; track read(row, 'Code')) {
+                <tr><td class="head-cell">{{ read(row, 'HeadName') }}</td><td class="amt-cell">{{ toNumber(read(row, 'NetAmount')) }}</td></tr>
+              }
+            }
+            @if (netResult() < 0) {
+              <tr class="group-row net-row"><td>Net Loss c/o</td><td class="amt-cell">{{ -netResult() }}</td></tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr><td class="total-label">Total</td><td class="amt-cell total-value">{{ currencySymbol() }} {{ totalIncome() + (netResult() < 0 ? -netResult() : 0) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  }
+</div>

@@ -16,6 +16,7 @@ namespace StimesErp.Api.Services
         public int CompanyCode { get; set; }
         public int BranchCode { get; set; }
         public int PeriodId { get; set; }
+        public int EmpCode { get; set; }
     }
 
     public class AuthService
@@ -60,6 +61,7 @@ namespace StimesErp.Api.Services
 
             int userCode = Convert.ToInt32(dtAuth.Rows[0]["UserCode"]);
             int uCatCode = dtAuth.Rows[0]["UCatCode"] != DBNull.Value ? Convert.ToInt32(dtAuth.Rows[0]["UCatCode"]) : 0;
+            int empCode = dtAuth.Rows[0]["EmpCode"] != DBNull.Value ? Convert.ToInt32(dtAuth.Rows[0]["EmpCode"]) : 0;
 
             // --- 3. Track login session (same usp_TrackLoginUsers the desktop app calls) ---
             var trackParams = new[]
@@ -71,7 +73,7 @@ namespace StimesErp.Api.Services
             };
             _db.DataTransactionsByProcedure("usp_TrackLoginUsers", trackParams);
 
-            return new AuthResult { Success = true, UserCode = userCode, UserName = username, UCatCode = uCatCode };
+            return new AuthResult { Success = true, UserCode = userCode, UserName = username, UCatCode = uCatCode, EmpCode = empCode };
         }
     }
 

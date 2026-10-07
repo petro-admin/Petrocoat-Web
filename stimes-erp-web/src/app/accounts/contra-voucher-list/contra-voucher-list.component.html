@@ -1,0 +1,46 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Activity</div>
+      <h2>Contra</h2>
+    </div>
+    <div class="filters">
+      <input type="text" placeholder="Search Contra" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="primary" [disabled]="!rights().add" [title]="!rights().add ? 'You do not have permission to add' : ''" (click)="openNew()">+ New Contra</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Voucher No</th><th>Date</th><th>Amount</th><th>Narration</th><th></th></tr></thead>
+      <tbody>
+        @for (row of filteredRows(); track read(row, 'Code')) {
+          <tr class="data-row" (click)="open(row)">
+            <td>{{ read(row, 'VoucherNo') }}</td>
+            <td>{{ read(row, 'VoucherDate') | date:'dd-MM-yyyy' }}</td>
+            <td class="amount">{{ read(row, 'TotalAmount') }}</td>
+            <td>{{ read(row, 'Narration') || '-' }}</td>
+            <td class="actions-cell">
+              @if (rights().delete) {
+                <button type="button" class="remove-btn" [disabled]="deleting()" (click)="deleteRow(row, $event)">✕</button>
+              }
+            </td>
+          </tr>
+        }
+        @if (filteredRows().length === 0 && !loading()) {
+          <tr><td colspan="5" class="empty">No Contra vouchers found</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</div>

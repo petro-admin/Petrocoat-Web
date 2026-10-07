@@ -1,20 +1,6 @@
 :host {
   display: block;
-  --accent: #7a1f3d;
-  --accent-dark: #5e1730;
-  --accent-light: #fbeef1;
-  --ink: #1c2027;
-  --ink-muted: #667085;
-  --ink-faint: #98a2b3;
-  --border: #e4e7ec;
-  --border-strong: #d0d5dd;
-  --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --surface-sunken: #f4f5f7;
-  --radius-sm: 6px;
-  --radius-md: 10px;
   --radius-lg: 14px;
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
 }
@@ -28,6 +14,8 @@
   padding: 18px clamp(14px, 3vw, 32px) 60px;
   background: var(--surface-sunken);
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -42,6 +30,7 @@ header {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  flex: 0 0 auto;
 
   h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
 }
@@ -75,8 +64,12 @@ header {
   }
 }
 
+// flex:1 instead of a fixed max-height - the card grows to fill whatever vertical space
+// .page actually has, so a short list's card reaches the bottom of the screen instead of
+// leaving a big flat gap of plain background below it.
 .table-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  flex: 1;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -152,6 +145,11 @@ th {
   // filter goes on the <tr> itself (which carries the inline BgColour) - putting it on the <td>
   // wouldn't darken the row's own background, since a transparent td has nothing of its own to filter.
   &:hover { filter: brightness(0.94); }
+
+  // These inline BgColour values are always vivid/light desktop grid colors, designed around
+  // dark text (the desktop app has no dark theme) - pin the text to a fixed dark color instead of
+  // the theme's --ink, which would turn near-white and unreadable against them in dark mode.
+  &.tinted td { color: #1c2027; }
 }
 
 .actions-column {
@@ -174,6 +172,17 @@ th {
 }
 
 .empty { text-align: center; color: var(--ink-faint); padding: 24px; }
+.hint { color: var(--ink-muted); padding: 4px 2px; }
+.access-denied {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 .error {
   color: #9f1c2e;
   background: #fdecee;

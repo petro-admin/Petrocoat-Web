@@ -1,0 +1,129 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+    <header>
+      <h2>Staff Attendance (Face Recognition)</h2>
+      <div class="tabs">
+        <button type="button" [class.active]="activeTab() === 'scan'" (click)="activeTab.set('scan')">Scan / Check In-Out</button>
+        <button type="button" [class.active]="activeTab() === 'enroll'" (click)="activeTab.set('enroll')">Enroll Employee</button>
+      </div>
+    </header>
+
+    @if (modelsLoading()) { <p class="hint">Loading face recognition models...</p> }
+    @if (modelsError()) { <p class="error">{{ modelsError() }}</p> }
+
+    @if (activeTab() === 'scan') {
+      <section class="card">
+        <p class="hint">{{ descriptors().length }} employee(s) enrolled. Start the camera and have each staff member look at it - attendance is recorded automatically.</p>
+        <div class="camera-row">
+          <video #scanVideo autoplay muted playsinline class="camera-feed"></video>
+          <div class="camera-actions">
+            @if (!scanCameraOn()) {
+              <button type="button" class="primary" [disabled]="modelsLoading()" (click)="startScanCamera()">Start Camera</button>
+            } @else {
+              <button type="button" (click)="stopScanCamera()">Stop Camera</button>
+            }
+            <p class="scan-status">{{ scanStatus() }}</p>
+            @if (lastResult(); as r) {
+              <div class="last-result">
+                <strong>{{ r.name }}</strong> - {{ r.action === 'CheckIn' ? 'Checked In' : 'Checked Out' }}<br>
+                {{ r.time | date:'HH:mm:ss' }} ({{ r.confidence }}% match)
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Today's Attendance</h3>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Photo</th><th>Employee</th><th>Check In</th><th>Check Out</th></tr></thead>
+            <tbody>
+              @for (row of todayList(); track read(row, 'Code')) {
+                <tr>
+                  <td>
+                    @if (photoUrls()[toNumber(read(row, 'EmployeeCode'))]; as url) {
+                      <img [src]="url" class="avatar" />
+                    } @else {
+                      <span class="avatar-placeholder">{{ read(row, 'EmpFullName')?.charAt(0) }}</span>
+                    }
+                  </td>
+                  <td>{{ read(row, 'EmpFullName') }}</td>
+                  <td>{{ read(row, 'CheckInTime') | date:'dd-MM-yyyy HH:mm:ss' }}</td>
+                  <td>{{ read(row, 'CheckOutTime') ? (read(row, 'CheckOutTime') | date:'dd-MM-yyyy HH:mm:ss') : '-' }}</td>
+                </tr>
+              }
+              @if (todayList().length === 0) {
+                <tr><td colspan="4" class="empty">No attendance recorded today yet</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    @if (activeTab() === 'enroll') {
+      <section class="card">
+        <h3>Enroll via Camera</h3>
+        <p class="hint">One-time setup per employee - capture their face so the Scan tab can recognize them.</p>
+        <label class="employee-picker">
+          <span>Employee</span>
+          <input [ngModel]="enrollEmployeeText()" (ngModelChange)="enrollEmployeeText.set($event)" list="staff-enroll-employee-options"
+                 placeholder="Type employee name" (input)="onEnrollEmployeeTextChanged($any($event.target).value)" (change)="onEnrollEmployeeSelected($any($event.target).value)" />
+          <datalist id="staff-enroll-employee-options">
+            @for (e of employees(); track read(e, 'EmployeeCode')) {
+              @if (!isEnrolled(toNumber(read(e, 'EmployeeCode')))) {
+                <option [value]="read(e, 'EmpFullName')"></option>
+              }
+            }
+          </datalist>
+        </label>
+
+        <div class="camera-row">
+          <div class="face-frame">
+            <div class="face-ring" [style.background]="enrollCameraOn() ? ringGradient() : 'none'">
+              <div class="face-ring-inner">
+                <video #enrollVideo autoplay muted playsinline class="camera-feed-circle"></video>
+              </div>
+            </div>
+            @if (enrollCameraOn()) {
+              <div class="angle-dots">
+                @for (angle of enrollAngles; track angle.label; let idx = $index) {
+                  <span class="angle-dot" [class.done]="enrollComplete() || idx < enrollAngleIndex()" [class.current]="!enrollComplete() && idx === enrollAngleIndex()"></span>
+                }
+              </div>
+            }
+          </div>
+          <div class="camera-actions">
+            @if (!enrollCameraOn()) {
+              <button type="button" class="primary" [disabled]="modelsLoading()" (click)="startEnrollCamera()">Start Camera</button>
+            } @else if (enrollComplete()) {
+              <p class="enroll-success">✓ All 5 angles captured - enrolled successfully.</p>
+              <button type="button" class="primary" (click)="restartEnrollFlow()">Enroll Another</button>
+              <button type="button" (click)="stopEnrollCamera()">Stop Camera</button>
+            } @else {
+              <button type="button" (click)="stopEnrollCamera()">Stop Camera</button>
+
+              <p class="angle-instruction">
+                Step {{ enrollAngleIndex() + 1 }} of {{ enrollAngles.length }} -
+                {{ enrollAngles[enrollAngleIndex()].instruction }}
+              </p>
+
+              <button type="button" class="primary" [disabled]="capturingAngle() || enrolling()" (click)="captureCurrentAngle()">
+                {{ enrolling() ? 'Saving all angles...' : capturingAngle() ? 'Capturing...' : ('Capture: ' + enrollAngles[enrollAngleIndex()].label) }}
+              </button>
+              @if (enrollAngleIndex() > 0 && !enrolling()) {
+                <button type="button" (click)="restartEnrollFlow()">Start Over</button>
+              }
+              @if (enrollMessage()) { <p class="scan-status">{{ enrollMessage() }}</p> }
+            }
+          </div>
+        </div>
+      </section>
+    }
+  }
+</div>

@@ -1,0 +1,35 @@
+<div class="page">
+  @if (!rightsLoaded()) {
+    <p class="hint">Checking permissions...</p>
+  } @else if (!rights().access) {
+    <div class="access-denied">You do not have permission to view this form.</div>
+  } @else {
+  <header>
+    <div>
+      <div class="kicker">Accounts · Master</div>
+      <h2>{{ isNew ? 'New Cost Center' : 'Edit Cost Center' }}</h2>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="cancel()">Back</button>
+      <button type="button" class="primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving...' : 'Save' }}</button>
+    </div>
+  </header>
+
+  @if (loading()) { <p class="hint">Loading...</p> }
+  @if (errorMessage()) { <p class="error">{{ errorMessage() }}</p> }
+
+  <form [formGroup]="form" class="form-body">
+    <div class="card">
+      <div class="card-body">
+        <label>Cost Center Name</label>
+        <input formControlName="costCenterName" placeholder="e.g. Head Office" />
+
+        <label class="checkbox-row">
+          <input type="checkbox" formControlName="isActive" />
+          <span>Active</span>
+        </label>
+      </div>
+    </div>
+  </form>
+  }
+</div>

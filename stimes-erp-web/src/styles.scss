@@ -1,7 +1,116 @@
 * { box-sizing: border-box; }
+
+// Project-wide theme tokens - every component's own :host block used to hardcode these exact same
+// values directly (--ink, --ink-muted, --border, --surface, etc.), which is why a single global
+// light/dark toggle couldn't reach them before: a component's own :host declaration always wins
+// over whatever it would otherwise inherit from here. Those per-component declarations have been
+// removed so every screen now inherits these instead - flipping data-theme on <html> (see
+// ThemeService) really does repaint the whole app at once, the same way a browser's own appearance
+// setting does. Each module's own --accent/--accent-dark/--accent-light used to be its own fixed
+// brand color, hardcoded per component - those declarations were removed too, the same way, so
+// the Appearance page's accent picker (ThemeService.applyAccent) can now recolor every module's
+// buttons/highlights at once instead of just the shell chrome.
+:root {
+  // Tells the browser to render native form controls (select dropdown popups, scrollbars,
+  // date pickers) with light widget chrome - without this, a dark OS theme can make Chrome/Edge
+  // render a <select>'s popup list with a dark native background while the option text still
+  // defaults to black, making it unreadable. Each theme block below sets its own value.
+  color-scheme: light;
+  --ink: #1c2027;
+  --ink-muted: #667085;
+  --ink-faint: #98a2b3;
+  --border: #e4e7ec;
+  --border-strong: #d0d5dd;
+  --surface: #ffffff;
+  --surface-muted: #f9fafb;
+  --surface-sunken: #f4f5f7;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+  --accent: #bf5b3f;
+  --accent-dark: #a84d34;
+  --accent-light: #fdece5;
+
+  // Shell/Dashboard tokens - the app frame (topbar, sidebar flyout, module panel, quick
+  // settings, dashboard cards) has its own distinct warm-cream/dark-green brand palette,
+  // kept separate from the generic module tokens above. The sidebar rail itself is a fixed
+  // brand element (like a module's --accent) and stays the same dark green in both themes.
+  --shell-frame-bg: #f4f1eb;
+  --shell-panel-bg: #fffdf9;
+  --shell-surface: #ffffff;
+  --shell-border: #dce2dd;
+  --shell-ink: #263b3b;
+  --shell-ink-muted: #72807c;
+  --shell-ink-faint: #899390;
+  --shell-accent: #bf5b3f;
+  --shell-accent-dark: #a84d34;
+  --shell-accent-light: #e18a6f;
+  --shell-hover-tint: #e9dfd2;
+  --shell-hover-tint-accent: #fbeee8;
+  --shell-staged-border: #d8d3c7;
+  --shell-staged-ink: #b7ada0;
+  --shell-staged-icon-bg: #f1ede4;
+  --shell-crumb-sep: #c9c2b6;
+  --shell-sidebar-bg: #263b3b;
+  --shell-sidebar-hover-bg: #334c4b;
+  --shell-sidebar-ink: #e6ece7;
+  --shell-sidebar-ink-muted: #8fa5a0;
+  --shell-sidebar-border: #3a5351;
+  --shell-module-icon-bg: #405955;
+  --shell-module-icon-disabled-bg: #304845;
+  --shell-detail-icon-bg: #e5ece7;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e8eaed;
+  --ink-muted: #9aa4b2;
+  --ink-faint: #6b7280;
+  --border: #2d323c;
+  --border-strong: #3d434f;
+  --surface: #1a1d23;
+  --surface-muted: #22262e;
+  --surface-sunken: #14161a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px rgba(0, 0, 0, .35);
+
+  --shell-frame-bg: #14161a;
+  --shell-panel-bg: #1a1d23;
+  --shell-surface: #22262e;
+  --shell-border: #2d323c;
+  --shell-ink: #e8eaed;
+  --shell-ink-muted: #9aa4b2;
+  --shell-ink-faint: #6b7280;
+  --shell-hover-tint: rgba(255, 255, 255, .06);
+  --shell-hover-tint-accent: rgba(191, 91, 63, .18);
+  --shell-staged-border: #3d434f;
+  --shell-staged-ink: #6b7280;
+  --shell-staged-icon-bg: #22262e;
+  --shell-crumb-sep: #3d434f;
+  --shell-detail-icon-bg: #2a3330;
+}
+
+// Belt-and-braces alongside the color-scheme declarations above: every component sets its own
+// <select>'s color/background from the theme tokens, but relies on <option> inheriting them -
+// some browsers don't reliably inherit into a <select>'s native popup list, which is what left
+// Material Category's dropdown showing blank/unreadable rows even after color-scheme was set.
+// Styling option explicitly removes that inheritance dependency everywhere in the app at once.
+select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+// Text size (see ThemeService.applyTextSize) - the app's stylesheets are all px-based rather
+// than rem, so a root font-size change wouldn't cascade into anything; `zoom` scales the whole
+// rendered page (text AND spacing) uniformly instead. Non-standard but broadly supported in
+// Chromium/Edge/Safari, which is what this internal tool is used with.
+html {
+  zoom: var(--app-zoom, 1);
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-  background: #f4f5f7;
-  color: #222;
+  background: var(--surface-sunken);
+  color: var(--ink);
 }
